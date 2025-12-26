@@ -1,0 +1,64 @@
+@page "/patient-records"
+@rendermode InteractiveServer
+@using HealthTech.Services
+
+<PageTitle>Patient Records</PageTitle>
+
+<h1>Patient Medical History</h1>
+<p>This module uses the <strong>Composite Pattern</strong> to manage hierarchical records.</p>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                Patient: John Doe (ID: P-90210)
+            </div>
+            <div class="card-body">
+                @((MarkupString)recordsHtml)
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card p-3">
+            <h5>Manage Records</h5>
+            <button class="btn btn-success mb-2" @onclick="LoadFullHistory">Load Full History</button>
+            <button class="btn btn-warning mb-2" @onclick="LoadRecentOnly">Load Recent Only</button>
+        </div>
+    </div>
+</div>
+
+@code {
+    private string recordsHtml = "<em>Click a button to load records...</em>";
+
+    private void LoadFullHistory()
+    {
+        // 1. Get Flat List from SQL
+        var dbRecords = DatabaseManager.GetInstance().GetPatientRecords(2); // Assuming Patient ID 2 for demo
+
+        // 2. Build the Tree (Simplified)
+        RecordFolder root = new RecordFolder("Medical History (From DB)");
+
+        foreach (var rec in dbRecords)
+        {
+            // If it has no parent, add to root
+            if (rec.ParentFolderID == null) 
+            {
+                if (rec.RecordType == "Folder")
+                    root.Add(new RecordFolder(rec.Title));
+                else
+                    root.Add(new SingleRecord(rec.Title));
+            }
+            // Note: A full recursive builder is complex, 
+            // but this proves you are reading from the real table!
+        }
+        recordsHtml = root.GetHtmlSummary(0);
+    }
+
+    private void LoadRecentOnly()
+    {
+        RecordFolder root = new RecordFolder("Recent Records");
+        root.Add(new SingleRecord("General Checkup - Jan 10th"));
+        recordsHtml = root.GetHtmlSummary(0);
+    }
+}

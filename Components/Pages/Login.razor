@@ -1,0 +1,103 @@
+@page "/login"
+@rendermode InteractiveServer
+@using HealthTech.Services
+@inject UserSession Session
+@inject NavigationManager Nav
+
+<PageTitle>Login</PageTitle>
+
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white text-center">
+                    <h3>MedEase Login</h3>
+                </div>
+                <div class="card-body">
+                    
+                    <div class="d-flex justify-content-center mb-4">
+                        <button class="btn @(isLoginMode ? "btn-primary" : "btn-outline-primary") me-2" 
+                                @onclick="() => isLoginMode = true">Login</button>
+                        <button class="btn @(!isLoginMode ? "btn-success" : "btn-outline-success")" 
+                                @onclick="() => isLoginMode = false">Register New User</button>
+                    </div>
+
+                    @if (isLoginMode)
+                    {
+                        <div class="mb-3">
+                            <label>Username:</label>
+                            <input class="form-control" @bind="username" placeholder="Enter username" />
+                        </div>
+                        <div class="mb-3">
+                            <label>Password:</label>
+                            <input type="password" class="form-control" @bind="password" placeholder="Enter password" />
+                        </div>
+                        <button class="btn btn-primary w-100" @onclick="DoLogin">Login</button>
+                    }
+                    else
+                    {
+                        <div class="mb-3">
+                            <label>New Username:</label>
+                            <input class="form-control" @bind="regName" />
+                        </div>
+                        <div class="mb-3">
+                            <label>Select Role:</label>
+                            <select class="form-control" @bind="regRole">
+                                <option value="Patient">Patient</option>
+                                <option value="Doctor">Doctor</option>
+                                <option value="Receptionist">Receptionist</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label>New Password:</label>
+                            <input type="password" class="form-control" @bind="regPass" />
+                        </div>
+                        <button class="btn btn-success w-100" @onclick="DoRegister">Create Account</button>
+                    }
+
+                    <p class="text-center mt-3 text-danger">@message</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    bool isLoginMode = true;
+    string username = "";
+    string password = "";
+    string message = "";
+
+    // Register vars
+    string regName = "";
+    string regPass = "";
+    string regRole = "Patient";
+
+    private void DoLogin()
+    {
+        var user = DatabaseManager.GetInstance().LoginUser(username, password);
+        if (user != null)
+        {
+            Session.Login(user);
+            Nav.NavigateTo("/"); // Go to Home Page
+        }
+        else
+        {
+            message = "Invalid Username or Password!";
+        }
+    }
+
+    private void DoRegister()
+    {
+        try
+        {
+            DatabaseManager.GetInstance().RegisterUser(regName, regPass, regRole);
+            message = "Success! Please switch to Login.";
+            isLoginMode = true; // Switch back to login tab
+        }
+        catch (Exception ex)
+        {
+            message = "Error: " + ex.Message;
+        }
+    }
+}

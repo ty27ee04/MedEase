@@ -1,0 +1,122 @@
+@page "/book-appointment"
+@rendermode InteractiveServer
+@inject UserSession Session
+@using HealthTech.Services
+
+<PageTitle>Book Appointment</PageTitle>
+
+<h1>Book Appointment</h1>
+
+<div class="card p-4 shadow-sm">
+    <div class="row">
+        <div class="col-md-6 mb-3">
+            <label>Patient:</label>
+            <select class="form-control" @bind="selectedPatientId">
+                @foreach (var p in patients)
+                {
+                    <option value="@p.UserID">@p.Name (ID: @p.UserID)</option>
+                }
+            </select>
+        </div>
+
+        <div class="col-md-6 mb-3">
+            <label>Doctor:</label>
+            <select class="form-control" @bind="selectedDoctorId">
+                @foreach (var d in doctors)
+                {
+                    <option value="@d.UserID">@d.Name (ID: @d.UserID)</option>
+                }
+            </select>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6 mb-3">
+            <label>Type:</label>
+            <select class="form-control" @bind="selectedType">
+                <option value="Physical">Physical (In-Person)</option>
+                <option value="Online">Online (Zoom)</option>
+            </select>
+        </div>
+
+        <div class="col-md-6 mb-3">
+             <label>Room (Physical Only):</label>
+             <select class="form-control" @bind="selectedRoomId" disabled="@(selectedType == "Online")">
+                 <option value="">-- No Room --</option>
+                 @foreach (var r in rooms)
+                 {
+                     <option value="@r.RoomID">Room @r.RoomNumber (@r.RoomType)</option>
+                 }
+             </select>
+        </div>
+    </div>
+
+    <button class="btn btn-primary w-100" @onclick="ProcessBooking">Confirm Booking</button>
+</div>
+
+@if (!string.IsNullOrEmpty(bookingResult))
+{
+    <div class="alert alert-success mt-3">@bookingResult</div>
+}
+
+@code {
+    // Lists for Dropdowns
+    private List<User> patients = new List<User>();
+    private List<User> doctors = new List<User>();
+    private List<Room> rooms = new List<Room>();
+
+    // Form Selection Variables
+    private int selectedPatientId;
+    private int selectedDoctorId;
+    private int? selectedRoomId; // Nullable
+    private string selectedType = "Physical";
+    private string bookingResult = "";
+
+    protected override void OnInitialized()
+    {
+        // Load real data from DB for dropdowns
+        var db = DatabaseManager.GetInstance();
+        patients = db.GetUsersByRole("Patient");
+        doctors = db.GetUsersByRole("Doctor");
+        rooms = db.GetRooms();
+
+        // Set defaults to avoid "0" ID errors
+        if (patients.Count > 0) selectedPatientId = patients[0].UserID;
+        if (doctors.Count > 0) selectedDoctorId = doctors[0].UserID;
+        if (rooms.Count > 0) selectedRoomId = rooms[0].RoomID;
+    }
+
+    private void ProcessBooking()
+    {
+        try 
+        {
+            // 1. Factory Logic (Generates details/link)
+            AppointmentFactory factory = new MedicalAppointmentFactory();
+            IAppointment appointmentObj = factory.CreateAppointment(selectedType);
+            string details = appointmentObj.GetBookingDetails();
+
+            // 2. Observer Logic (Notification)
+            if (appointmentObj is Subject subject) subject.Attach(new EmailNotifier());
+            if (appointmentObj is InPersonAppointment p) p.ConfirmBooking("Patient #" + selectedPatientId);
+
+            // 3. Save to REAL Database with Foreign Keys
+            var newAppt = new AppointmentModel
+            {
+                PatientID = selectedPatientId,
+                DoctorID = selectedDoctorId,
+                RoomID = (selectedType == "Physical") ? selectedRoomId : null,
+                Type = selectedType,
+                DateTime = DateTime.Now,
+                Status = "Confirmed",
+                Link = (selectedType == "Online") ? details : null // Save zoom link if online
+            };
+
+            DatabaseManager.GetInstance().AddAppointment(newAppt);
+            bookingResult = "Success! Appointment saved to Database.";
+        }
+        catch (Exception ex)
+        {
+            bookingResult = "Error: " + ex.Message;
+        }
+    }
+}
