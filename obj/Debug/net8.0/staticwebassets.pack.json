@@ -1,23 +1,23 @@
 {
   "Files": [
     {
-      "Id": "D:\\School\\Degree\\Y2S3\\CSE6234 Software Design\\Assignment\\Project\\HealthTech\\obj\\Debug\\net8.0\\scopedcss\\projectbundle\\HealthTech.bundle.scp.css",
+      "Id": "C:\\xampp\\htdocs\\MedEase\\obj\\Debug\\net8.0\\scopedcss\\projectbundle\\HealthTech.bundle.scp.css",
       "PackagePath": "staticwebassets\\HealthTech.bundle.scp.css"
     },
     {
-      "Id": "D:\\School\\Degree\\Y2S3\\CSE6234 Software Design\\Assignment\\Project\\HealthTech\\wwwroot\\app.css",
+      "Id": "C:\\xampp\\htdocs\\MedEase\\wwwroot\\app.css",
       "PackagePath": "staticwebassets\\app.css"
     },
     {
-      "Id": "D:\\School\\Degree\\Y2S3\\CSE6234 Software Design\\Assignment\\Project\\HealthTech\\wwwroot\\bootstrap\\bootstrap.min.css",
+      "Id": "C:\\xampp\\htdocs\\MedEase\\wwwroot\\bootstrap\\bootstrap.min.css",
       "PackagePath": "staticwebassets\\bootstrap\\bootstrap.min.css"
     },
     {
-      "Id": "D:\\School\\Degree\\Y2S3\\CSE6234 Software Design\\Assignment\\Project\\HealthTech\\wwwroot\\bootstrap\\bootstrap.min.css.map",
+      "Id": "C:\\xampp\\htdocs\\MedEase\\wwwroot\\bootstrap\\bootstrap.min.css.map",
       "PackagePath": "staticwebassets\\bootstrap\\bootstrap.min.css.map"
     },
     {
-      "Id": "D:\\School\\Degree\\Y2S3\\CSE6234 Software Design\\Assignment\\Project\\HealthTech\\wwwroot\\favicon.png",
+      "Id": "C:\\xampp\\htdocs\\MedEase\\wwwroot\\favicon.png",
       "PackagePath": "staticwebassets\\favicon.png"
     },
     {

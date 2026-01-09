@@ -1,6 +1,6 @@
 {
   "Version": 1,
-  "Hash": "HAoet6NHQ70Pph3e/Xum8rx+JLVhAPE6rGdYzFXGZHo=",
+  "Hash": "xUdnlpP03n+CsYa14Ju+ygn+TOzknyMuL/X824n65wk=",
   "Source": "HealthTech",
   "BasePath": "_content/HealthTech",
   "Mode": "Default",
@@ -10,17 +10,17 @@
     {
       "Name": "HealthTech\\wwwroot",
       "Source": "HealthTech",
-      "ContentRoot": "D:\\School\\Degree\\Y2S3\\CSE6234 Software Design\\Assignment\\Project\\HealthTech\\wwwroot\\",
+      "ContentRoot": "C:\\xampp\\htdocs\\MedEase\\wwwroot\\",
       "BasePath": "_content/HealthTech",
       "Pattern": "**"
     }
   ],
   "Assets": [
     {
-      "Identity": "D:\\School\\Degree\\Y2S3\\CSE6234 Software Design\\Assignment\\Project\\HealthTech\\obj\\Debug\\net8.0\\scopedcss\\bundle\\HealthTech.styles.css",
+      "Identity": "C:\\xampp\\htdocs\\MedEase\\obj\\Debug\\net8.0\\scopedcss\\bundle\\HealthTech.styles.css",
       "SourceId": "HealthTech",
       "SourceType": "Computed",
-      "ContentRoot": "D:\\School\\Degree\\Y2S3\\CSE6234 Software Design\\Assignment\\Project\\HealthTech\\obj\\Debug\\net8.0\\scopedcss\\bundle\\",
+      "ContentRoot": "C:\\xampp\\htdocs\\MedEase\\obj\\Debug\\net8.0\\scopedcss\\bundle\\",
       "BasePath": "_content/HealthTech",
       "RelativePath": "HealthTech.styles.css",
       "AssetKind": "All",
@@ -33,13 +33,13 @@
       "AssetTraitValue": "ApplicationBundle",
       "CopyToOutputDirectory": "Never",
       "CopyToPublishDirectory": "PreserveNewest",
-      "OriginalItemSpec": "D:\\School\\Degree\\Y2S3\\CSE6234 Software Design\\Assignment\\Project\\HealthTech\\obj\\Debug\\net8.0\\scopedcss\\bundle\\HealthTech.styles.css"
+      "OriginalItemSpec": "C:\\xampp\\htdocs\\MedEase\\obj\\Debug\\net8.0\\scopedcss\\bundle\\HealthTech.styles.css"
     },
     {
-      "Identity": "D:\\School\\Degree\\Y2S3\\CSE6234 Software Design\\Assignment\\Project\\HealthTech\\obj\\Debug\\net8.0\\scopedcss\\projectbundle\\HealthTech.bundle.scp.css",
+      "Identity": "C:\\xampp\\htdocs\\MedEase\\obj\\Debug\\net8.0\\scopedcss\\projectbundle\\HealthTech.bundle.scp.css",
       "SourceId": "HealthTech",
       "SourceType": "Computed",
-      "ContentRoot": "D:\\School\\Degree\\Y2S3\\CSE6234 Software Design\\Assignment\\Project\\HealthTech\\obj\\Debug\\net8.0\\scopedcss\\projectbundle\\",
+      "ContentRoot": "C:\\xampp\\htdocs\\MedEase\\obj\\Debug\\net8.0\\scopedcss\\projectbundle\\",
       "BasePath": "_content/HealthTech",
       "RelativePath": "HealthTech.bundle.scp.css",
       "AssetKind": "All",
@@ -52,13 +52,13 @@
       "AssetTraitValue": "ProjectBundle",
       "CopyToOutputDirectory": "Never",
       "CopyToPublishDirectory": "PreserveNewest",
-      "OriginalItemSpec": "D:\\School\\Degree\\Y2S3\\CSE6234 Software Design\\Assignment\\Project\\HealthTech\\obj\\Debug\\net8.0\\scopedcss\\projectbundle\\HealthTech.bundle.scp.css"
+      "OriginalItemSpec": "C:\\xampp\\htdocs\\MedEase\\obj\\Debug\\net8.0\\scopedcss\\projectbundle\\HealthTech.bundle.scp.css"
     },
     {
-      "Identity": "D:\\School\\Degree\\Y2S3\\CSE6234 Software Design\\Assignment\\Project\\HealthTech\\wwwroot\\app.css",
+      "Identity": "C:\\xampp\\htdocs\\MedEase\\wwwroot\\app.css",
       "SourceId": "HealthTech",
       "SourceType": "Discovered",
-      "ContentRoot": "D:\\School\\Degree\\Y2S3\\CSE6234 Software Design\\Assignment\\Project\\HealthTech\\wwwroot\\",
+      "ContentRoot": "C:\\xampp\\htdocs\\MedEase\\wwwroot\\",
       "BasePath": "_content/HealthTech",
       "RelativePath": "app.css",
       "AssetKind": "All",
@@ -74,10 +74,10 @@
       "OriginalItemSpec": "wwwroot\\app.css"
     },
     {
-      "Identity": "D:\\School\\Degree\\Y2S3\\CSE6234 Software Design\\Assignment\\Project\\HealthTech\\wwwroot\\bootstrap\\bootstrap.min.css",
+      "Identity": "C:\\xampp\\htdocs\\MedEase\\wwwroot\\bootstrap\\bootstrap.min.css",
       "SourceId": "HealthTech",
       "SourceType": "Discovered",
-      "ContentRoot": "D:\\School\\Degree\\Y2S3\\CSE6234 Software Design\\Assignment\\Project\\HealthTech\\wwwroot\\",
+      "ContentRoot": "C:\\xampp\\htdocs\\MedEase\\wwwroot\\",
       "BasePath": "_content/HealthTech",
       "RelativePath": "bootstrap/bootstrap.min.css",
       "AssetKind": "All",
@@ -93,10 +93,10 @@
       "OriginalItemSpec": "wwwroot\\bootstrap\\bootstrap.min.css"
     },
     {
-      "Identity": "D:\\School\\Degree\\Y2S3\\CSE6234 Software Design\\Assignment\\Project\\HealthTech\\wwwroot\\bootstrap\\bootstrap.min.css.map",
+      "Identity": "C:\\xampp\\htdocs\\MedEase\\wwwroot\\bootstrap\\bootstrap.min.css.map",
       "SourceId": "HealthTech",
       "SourceType": "Discovered",
-      "ContentRoot": "D:\\School\\Degree\\Y2S3\\CSE6234 Software Design\\Assignment\\Project\\HealthTech\\wwwroot\\",
+      "ContentRoot": "C:\\xampp\\htdocs\\MedEase\\wwwroot\\",
       "BasePath": "_content/HealthTech",
       "RelativePath": "bootstrap/bootstrap.min.css.map",
       "AssetKind": "All",
@@ -112,10 +112,10 @@
       "OriginalItemSpec": "wwwroot\\bootstrap\\bootstrap.min.css.map"
     },
     {
-      "Identity": "D:\\School\\Degree\\Y2S3\\CSE6234 Software Design\\Assignment\\Project\\HealthTech\\wwwroot\\favicon.png",
+      "Identity": "C:\\xampp\\htdocs\\MedEase\\wwwroot\\favicon.png",
       "SourceId": "HealthTech",
       "SourceType": "Discovered",
-      "ContentRoot": "D:\\School\\Degree\\Y2S3\\CSE6234 Software Design\\Assignment\\Project\\HealthTech\\wwwroot\\",
+      "ContentRoot": "C:\\xampp\\htdocs\\MedEase\\wwwroot\\",
       "BasePath": "_content/HealthTech",
       "RelativePath": "favicon.png",
       "AssetKind": "All",

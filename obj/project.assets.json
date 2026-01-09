@@ -594,19 +594,19 @@
     ]
   },
   "packageFolders": {
-    "C:\\Users\\user\\.nuget\\packages\\": {}
+    "C:\\Users\\Owner\\.nuget\\packages\\": {}
   },
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "D:\\School\\Degree\\Y2S3\\CSE6234 Software Design\\Assignment\\Project\\HealthTech\\HealthTech.csproj",
+      "projectUniqueName": "C:\\xampp\\htdocs\\MedEase\\HealthTech.csproj",
       "projectName": "HealthTech",
-      "projectPath": "D:\\School\\Degree\\Y2S3\\CSE6234 Software Design\\Assignment\\Project\\HealthTech\\HealthTech.csproj",
-      "packagesPath": "C:\\Users\\user\\.nuget\\packages\\",
-      "outputPath": "D:\\School\\Degree\\Y2S3\\CSE6234 Software Design\\Assignment\\Project\\HealthTech\\obj\\",
+      "projectPath": "C:\\xampp\\htdocs\\MedEase\\HealthTech.csproj",
+      "packagesPath": "C:\\Users\\Owner\\.nuget\\packages\\",
+      "outputPath": "C:\\xampp\\htdocs\\MedEase\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
-        "C:\\Users\\user\\AppData\\Roaming\\NuGet\\NuGet.Config"
+        "C:\\Users\\Owner\\AppData\\Roaming\\NuGet\\NuGet.Config"
       ],
       "originalTargetFrameworks": [
         "net8.0"
