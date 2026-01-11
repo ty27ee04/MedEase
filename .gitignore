@@ -10,3 +10,12 @@ obj/
 *.suo
 *.userosscache
 *.sln.docstates
+
+# build outputs
+bin/
+obj/
+**/bin/
+**/obj/
+*.dll
+*.exe
+*.pdb
