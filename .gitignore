@@ -1,21 +1,35 @@
-# --- Build Results ---
-[Bb]in/
-[Oo]bj/
-
-# --- User Specific ---
-*.user
-*.userosscache
-*.sln.docstates
-
-# --- Visual Studio / VS Code ---
-.vs/
-.vscode/
+appsettings.Development.json
+appsettings.Production.json
+appsettings.json
+appsettings.Development.json
+bin\Debug\net8.0\appsettings.json
+bin\Debug\net8.0\appsettings.Development.json
+*.md
 
 # --- Secrets & Environment Config ---
 appsettings.Development.json
 appsettings.Production.json
 *.env
 
-# --- OS Generated ---
-.DS_Store
-Thumbs.db
+# Visual Studio
+.vs/
+.vscode/
+
+# Build outputs
+bin/
+obj/
+
+# User-specific files
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# build outputs
+bin/
+obj/
+**/bin/
+**/obj/
+*.dll
+*.exe
+*.pdb
