@@ -43,9 +43,17 @@
         "net8.0": {
           "targetAlias": "net8.0",
           "dependencies": {
+            "MailKit": {
+              "target": "Package",
+              "version": "[4.3.0, )"
+            },
             "MySql.Data": {
               "target": "Package",
               "version": "[9.5.0, )"
+            },
+            "Twilio": {
+              "target": "Package",
+              "version": "[7.6.0, )"
             }
           },
           "imports": [

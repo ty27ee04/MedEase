@@ -8,6 +8,8 @@
 
   <ItemGroup>
     <PackageReference Include="MySql.Data" Version="9.5.0" />
+    <PackageReference Include="MailKit" Version="4.3.0" />
+    <PackageReference Include="Twilio" Version="7.6.0" />
   </ItemGroup>
 
 </Project>
