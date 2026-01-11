@@ -54,6 +54,10 @@ build_metadata.AdditionalFiles.CssScope =
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xQYXRpZW50UmVjb3Jkcy5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = 
 
+[D:/School/Degree/Y2S3/CSE6234 Software Design/Assignment/Project/HealthTech/Components/Pages/UpcomingAppointments.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xVcGNvbWluZ0FwcG9pbnRtZW50cy5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
 [D:/School/Degree/Y2S3/CSE6234 Software Design/Assignment/Project/HealthTech/Components/Pages/Weather.razor]
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xXZWF0aGVyLnJhem9y
 build_metadata.AdditionalFiles.CssScope = 
