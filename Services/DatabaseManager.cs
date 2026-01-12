@@ -237,7 +237,7 @@ public void AddAppointment(AppointmentModel appt)
             using (var conn = new MySqlConnection(connectionString))
             {
                 conn.Open();
-                string sql = "SELECT * FROM PatientRecord WHERE patientID = @pid";
+                string sql = "SELECT * FROM PatientRecord WHERE patientID = @pid ORDER BY recordID";
                 using (var cmd = new MySqlCommand(sql, conn))
                 {
                     cmd.Parameters.AddWithValue("@pid", patientId);
@@ -249,7 +249,7 @@ public void AddAppointment(AppointmentModel appt)
                             {
                                 RecordID = Convert.ToInt32(reader["recordID"]),
                                 PatientID = Convert.ToInt32(reader["patientID"]),
-                                ParentFolderID = reader["parentFolderID"] as int?,
+                                ParentFolderID = reader["parentFolderID"] == DBNull.Value ? null : (int?)Convert.ToInt32(reader["parentFolderID"]),
                                 RecordType = reader["recordType"].ToString(),
                                 Title = reader["title"].ToString(),
                                 Details = reader["details"].ToString()
@@ -259,6 +259,44 @@ public void AddAppointment(AppointmentModel appt)
                 }
             }
             return list;
+        }
+
+        // 5. COMPOSITE PATTERN: Add New Patient Record
+        public void AddPatientRecord(RecordModel record)
+        {
+            using (var conn = new MySqlConnection(connectionString))
+            {
+                conn.Open();
+                string sql = @"INSERT INTO PatientRecord 
+                               (patientID, parentFolderID, recordType, title, details) 
+                               VALUES (@pid, @parentId, @type, @title, @details)";
+                
+                using (var cmd = new MySqlCommand(sql, conn))
+                {
+                    cmd.Parameters.AddWithValue("@pid", record.PatientID);
+                    cmd.Parameters.AddWithValue("@parentId", record.ParentFolderID.HasValue ? (object)record.ParentFolderID.Value : DBNull.Value);
+                    cmd.Parameters.AddWithValue("@type", record.RecordType);
+                    cmd.Parameters.AddWithValue("@title", record.Title);
+                    cmd.Parameters.AddWithValue("@details", record.Details ?? "");
+                    cmd.ExecuteNonQuery();
+                }
+            }
+        }
+
+        // 6. COMPOSITE PATTERN: Delete Patient Record (and its children if it's a folder)
+        public void DeletePatientRecord(int recordId)
+        {
+            using (var conn = new MySqlConnection(connectionString))
+            {
+                conn.Open();
+                // First, recursively delete all children
+                string deleteSql = "DELETE FROM PatientRecord WHERE recordID = @rid OR parentFolderID = @rid";
+                using (var cmd = new MySqlCommand(deleteSql, conn))
+                {
+                    cmd.Parameters.AddWithValue("@rid", recordId);
+                    cmd.ExecuteNonQuery();
+                }
+            }
         }
 
         // 1. REGISTER: Add a new user to the database
