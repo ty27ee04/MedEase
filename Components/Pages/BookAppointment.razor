@@ -79,26 +79,24 @@
             }
             else
             {
-                <div style="max-height: 200px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px; padding: 10px;">
+                <select class="form-control" @bind="selectedTimeSlotString" @bind:after="OnTimeSlotChanged">
+                    <option value="">-- Select Time Slot --</option>
                     @foreach (var slot in availableSlots)
                     {
-                        <div class="form-check">
-                            <input class="form-check-input" type="radio" 
-                                   name="timeSlot" 
-                                   id="slot_@slot.DateTime.Ticks" 
-                                   value="@slot.DateTime"
-                                   @onchange="() => OnTimeSlotSelected(slot)"
-                                   disabled="@(!slot.IsAvailable)" />
-                            <label class="form-check-label @(!slot.IsAvailable ? "text-muted" : "")" for="slot_@slot.DateTime.Ticks">
+                        if (slot.IsAvailable)
+                        {
+                            <option value="@slot.DateTime.ToString("O")">
                                 @slot.DateTime.ToString("hh:mm tt")
-                                @if (!slot.IsAvailable)
-                                {
-                                    <small class="text-danger">(@slot.Reason)</small>
-                                }
-                            </label>
-                        </div>
+                            </option>
+                        }
+                        else
+                        {
+                            <option value="" disabled>
+                                @slot.DateTime.ToString("hh:mm tt") - @slot.Reason
+                            </option>
+                        }
                     }
-                </div>
+                </select>
             }
         </div>
     </div>
@@ -142,6 +140,7 @@
     private string selectedType = "Physical";
     private DateTime selectedDate = DateTime.Now.Date.AddDays(1); // Default to tomorrow
     private DateTime? selectedDateTime = null;
+    private string selectedTimeSlotString = ""; // For dropdown binding
     
     private string bookingResult = "";
     private bool isProcessing = false;
@@ -167,12 +166,14 @@
     private async Task OnDoctorChanged()
     {
         selectedDateTime = null;
+        selectedTimeSlotString = "";
         await LoadTimeSlots();
     }
 
     private async Task OnDateChanged()
     {
         selectedDateTime = null;
+        selectedTimeSlotString = "";
         await LoadTimeSlots();
     }
 
@@ -201,12 +202,23 @@
         }
     }
 
-    private void OnTimeSlotSelected(TimeSlot slot)
+    private void OnTimeSlotChanged()
     {
-        if (slot.IsAvailable)
+        if (!string.IsNullOrEmpty(selectedTimeSlotString))
         {
-            selectedDateTime = slot.DateTime;
-            StateHasChanged();
+            try
+            {
+                selectedDateTime = DateTime.Parse(selectedTimeSlotString);
+                StateHasChanged();
+            }
+            catch
+            {
+                selectedDateTime = null;
+            }
+        }
+        else
+        {
+            selectedDateTime = null;
         }
     }
 
