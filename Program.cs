@@ -1,4 +1,5 @@
 using HealthTech.Components;
+using HealthTech.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -6,7 +7,12 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
-builder.Services.AddScoped<HealthTech.Services.UserSession>();
+// Register custom services
+builder.Services.AddScoped<UserSession>();
+builder.Services.AddScoped<NotificationService>();
+
+// Register background service for appointment reminders
+builder.Services.AddHostedService<AppointmentReminderService>();
 
 var app = builder.Build();
 
