@@ -237,7 +237,7 @@ public void AddAppointment(AppointmentModel appt)
             using (var conn = new MySqlConnection(connectionString))
             {
                 conn.Open();
-                string sql = "SELECT * FROM PatientRecord WHERE patientID = @pid";
+                string sql = "SELECT * FROM PatientRecord WHERE patientID = @pid ORDER BY recordID";
                 using (var cmd = new MySqlCommand(sql, conn))
                 {
                     cmd.Parameters.AddWithValue("@pid", patientId);
@@ -249,7 +249,7 @@ public void AddAppointment(AppointmentModel appt)
                             {
                                 RecordID = Convert.ToInt32(reader["recordID"]),
                                 PatientID = Convert.ToInt32(reader["patientID"]),
-                                ParentFolderID = reader["parentFolderID"] as int?,
+                                ParentFolderID = reader["parentFolderID"] == DBNull.Value ? null : (int?)Convert.ToInt32(reader["parentFolderID"]),
                                 RecordType = reader["recordType"].ToString(),
                                 Title = reader["title"].ToString(),
                                 Details = reader["details"].ToString()
@@ -259,6 +259,44 @@ public void AddAppointment(AppointmentModel appt)
                 }
             }
             return list;
+        }
+
+        // 5. COMPOSITE PATTERN: Add New Patient Record
+        public void AddPatientRecord(RecordModel record)
+        {
+            using (var conn = new MySqlConnection(connectionString))
+            {
+                conn.Open();
+                string sql = @"INSERT INTO PatientRecord 
+                               (patientID, parentFolderID, recordType, title, details) 
+                               VALUES (@pid, @parentId, @type, @title, @details)";
+                
+                using (var cmd = new MySqlCommand(sql, conn))
+                {
+                    cmd.Parameters.AddWithValue("@pid", record.PatientID);
+                    cmd.Parameters.AddWithValue("@parentId", record.ParentFolderID.HasValue ? (object)record.ParentFolderID.Value : DBNull.Value);
+                    cmd.Parameters.AddWithValue("@type", record.RecordType);
+                    cmd.Parameters.AddWithValue("@title", record.Title);
+                    cmd.Parameters.AddWithValue("@details", record.Details ?? "");
+                    cmd.ExecuteNonQuery();
+                }
+            }
+        }
+
+        // 6. COMPOSITE PATTERN: Delete Patient Record (and its children if it's a folder)
+        public void DeletePatientRecord(int recordId)
+        {
+            using (var conn = new MySqlConnection(connectionString))
+            {
+                conn.Open();
+                // First, recursively delete all children
+                string deleteSql = "DELETE FROM PatientRecord WHERE recordID = @rid OR parentFolderID = @rid";
+                using (var cmd = new MySqlCommand(deleteSql, conn))
+                {
+                    cmd.Parameters.AddWithValue("@rid", recordId);
+                    cmd.ExecuteNonQuery();
+                }
+            }
         }
 
         // 1. REGISTER: Add a new user to the database
@@ -364,10 +402,10 @@ public void AddAppointment(AppointmentModel appt)
                 conn.Open();
 
                 // 1. Check if doctor has specific date override (on-leave or off-day)
-                string checkSpecificDate = @"SELECT * FROM WorkingTime 
+                // This checks for exact date match regardless of startTime/endTime values
+                string checkSpecificDate = @"SELECT type FROM WorkingTime 
                                            WHERE doctorID = @doctorId 
-                                           AND date = @date 
-                                           AND type IN ('OnLeave', 'OffDay')";
+                                           AND date = @date";
                 
                 using (var cmd = new MySqlCommand(checkSpecificDate, conn))
                 {
@@ -378,8 +416,12 @@ public void AddAppointment(AppointmentModel appt)
                     {
                         if (reader.Read())
                         {
-                            // Doctor is not available on this date
-                            return slots; // Empty list
+                            string type = reader["type"].ToString();
+                            if (type == "on leave" || type == "off day")
+                            {
+                                // Doctor is not available on this date
+                                return slots; // Empty list
+                            }
                         }
                     }
                 }
@@ -417,11 +459,11 @@ public void AddAppointment(AppointmentModel appt)
                     return slots;
                 }
 
-                // 3. Get existing appointments for this doctor on this date
+                // 3. Get existing appointments for this doctor on this date (including next day for overnight shifts)
                 var bookedTimes = new List<DateTime>();
                 string getAppointments = @"SELECT dateTime FROM Appointment 
                                          WHERE doctorID = @doctorId 
-                                         AND DATE(dateTime) = @date
+                                         AND (DATE(dateTime) = @date OR DATE(dateTime) = DATE_ADD(@date, INTERVAL 1 DAY))
                                          AND status NOT IN ('Cancelled', 'Completed')";
                 
                 using (var cmd = new MySqlCommand(getAppointments, conn))
@@ -438,9 +480,88 @@ public void AddAppointment(AppointmentModel appt)
                     }
                 }
 
-                // 4. Generate time slots
+                // 4. Generate time slots (handles overnight shifts)
                 var currentTime = date.Date + startTime.Value;
                 var endDateTime = date.Date + endTime.Value;
+                
+                // If endTime is less than or equal to startTime, it means the shift crosses midnight
+                bool isOvernightShift = endTime.Value <= startTime.Value;
+                
+                if (isOvernightShift)
+                {
+                    // For overnight shifts, we need to check if we're showing:
+                    // - The first part (e.g., Sunday 17:00 to 23:59) OR
+                    // - The second part (e.g., Monday 00:00 to 04:00)
+                    
+                    // Show only the portion on the selected date (e.g., 17:00 to 23:30)
+                    endDateTime = date.Date.AddDays(1); // End at midnight for the start day
+                }
+                else
+                {
+                    // Normal shift (not overnight), check if we should show overnight portion from previous day
+                    var previousDay = date.AddDays(-1);
+                    var previousDayName = previousDay.DayOfWeek.ToString();
+                    
+                    string checkPreviousDayShift = @"SELECT startTime, endTime FROM WorkingTime 
+                                                    WHERE doctorID = @doctorId 
+                                                    AND day = @previousDay 
+                                                    AND type = 'Working'
+                                                    AND (date IS NULL OR date = @previousDate)
+                                                    ORDER BY date DESC LIMIT 1";
+                    
+                    TimeSpan? prevStartTime = null;
+                    TimeSpan? prevEndTime = null;
+                    
+                    using (var cmd = new MySqlCommand(checkPreviousDayShift, conn))
+                    {
+                        cmd.Parameters.AddWithValue("@doctorId", doctorId);
+                        cmd.Parameters.AddWithValue("@previousDay", previousDayName);
+                        cmd.Parameters.AddWithValue("@previousDate", previousDay.Date);
+                        
+                        using (var reader = cmd.ExecuteReader())
+                        {
+                            if (reader.Read())
+                            {
+                                prevStartTime = (TimeSpan)reader["startTime"];
+                                prevEndTime = (TimeSpan)reader["endTime"];
+                            }
+                        }
+                    }
+                    
+                    if (prevStartTime.HasValue && prevEndTime.HasValue && prevEndTime.Value <= prevStartTime.Value)
+                    {
+                        // Previous day has overnight shift, add the second part (e.g., 00:00 to 04:00)
+                        // First add the overnight portion from previous day
+                        var overnightCurrentTime = date.Date; // Start at midnight
+                        var overnightEndTime = date.Date + prevEndTime.Value;
+                        
+                        while (overnightCurrentTime < overnightEndTime)
+                        {
+                            var slot = new TimeSlot
+                            {
+                                DateTime = overnightCurrentTime,
+                                IsAvailable = true
+                            };
+
+                            // Check if this slot is already booked
+                            if (bookedTimes.Any(bt => bt == overnightCurrentTime))
+                            {
+                                slot.IsAvailable = false;
+                                slot.Reason = "Already booked";
+                            }
+
+                            // Don't show past time slots
+                            if (overnightCurrentTime <= DateTime.Now)
+                            {
+                                slot.IsAvailable = false;
+                                slot.Reason = "Past time";
+                            }
+
+                            slots.Add(slot);
+                            overnightCurrentTime = overnightCurrentTime.AddMinutes(slotDurationMinutes);
+                        }
+                    }
+                }
 
                 while (currentTime < endDateTime)
                 {

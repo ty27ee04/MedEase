@@ -127,29 +127,25 @@
                                     </span>
                                 </td>
                                 <td>
-                                    <div class="btn-group btn-group-sm" role="group">
-                                        <button class="btn btn-outline-primary" 
-                                                @onclick="() => EditAppointment(appt)"
-                                                title="Edit">
-                                            <i class="bi bi-pencil"></i>
+                                    <div class="d-flex gap-1 flex-wrap">
+                                        <button class="btn btn-sm btn-outline-primary" 
+                                                @onclick="() => EditAppointment(appt)">
+                                            <i class="bi bi-pencil me-1"></i>Edit
                                         </button>
-                                        <button class="btn btn-outline-info" 
+                                        <button class="btn btn-sm btn-outline-info" 
                                                 @onclick="() => ResendReminder(appt)"
-                                                title="Resend Reminder"
                                                 disabled="@isProcessing">
-                                            <i class="bi bi-bell"></i>
+                                            <i class="bi bi-bell me-1"></i>Remind
                                         </button>
-                                        <button class="btn btn-outline-warning" 
-                                                @onclick="() => CancelAppointment(appt)"
-                                                title="Cancel Appointment">
-                                            <i class="bi bi-x-circle"></i>
+                                        <button class="btn btn-sm btn-outline-warning" 
+                                                @onclick="() => CancelAppointment(appt)">
+                                            <i class="bi bi-x-circle me-1"></i>Cancel
                                         </button>
-                                        <button class="btn btn-outline-danger" 
+                                        <button class="btn btn-sm btn-outline-danger" 
                                                 @onclick="() => DeleteAppointment(appt.AppointmentID)"
-                                                title="Delete"
                                                 @onclick:preventDefault="true"
                                                 disabled="@isProcessing">
-                                            <i class="bi bi-trash"></i>
+                                            <i class="bi bi-trash me-1"></i>Delete
                                         </button>
                                     </div>
                                 </td>
