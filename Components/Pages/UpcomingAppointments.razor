@@ -24,49 +24,64 @@
     </div>
 }
 
+<!-- Edit Modal Dialog -->
 @if (isEditing)
 {
-    <div class="card p-4 mb-4 border-primary shadow-sm">
-        <h4>Edit Appointment #@editingModel.AppointmentID</h4>
-        
-        <div class="row">
-            <div class="col-md-6 mb-3">
-                <label><strong>Patient:</strong></label>
-                <input class="form-control" value="@editingModel.PatientName" disabled />
-            </div>
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Edit Appointment #@editingModel.AppointmentID</h5>
+                    <button type="button" class="btn-close" @onclick="CancelEdit"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label"><strong>Patient:</strong></label>
+                            <input class="form-control" value="@editingModel.PatientName" disabled />
+                        </div>
 
-            <div class="col-md-6 mb-3">
-                <label><strong>Doctor:</strong></label>
-                <input class="form-control" value="@editingModel.DoctorName" disabled />
-            </div>
-        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label"><strong>Doctor:</strong></label>
+                            <input class="form-control" value="@editingModel.DoctorName" disabled />
+                        </div>
+                    </div>
 
-        <div class="row">
-            <div class="col-md-6 mb-3">
-                <label><strong>Date & Time:</strong></label>
-                <input type="datetime-local" class="form-control" @bind="editingDateTime" />
-            </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label"><strong>Date & Time:</strong></label>
+                            <input type="datetime-local" class="form-control" @bind="editingDateTime" />
+                        </div>
 
-            <div class="col-md-6 mb-3">
-                <label><strong>Status:</strong></label>
-                <select class="form-control" @bind="editingModel.Status">
-                    <option value="Confirmed">Confirmed</option>
-                    <option value="Pending">Pending</option>
-                    <option value="Cancelled">Cancelled</option>
-                    <option value="Completed">Completed</option>
-                    <option value="ReminderSent">Reminder Sent</option>
-                    <option value="CheckedIn">Checked In</option>
-                </select>
-            </div>
-        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label"><strong>Status:</strong></label>
+                            <select class="form-control" @bind="editingModel.Status">
+                                <option value="Confirmed">Confirmed</option>
+                                <option value="Pending">Pending</option>
+                                <option value="Cancelled">Cancelled</option>
+                                <option value="Completed">Completed</option>
+                                <option value="ReminderSent">Reminder Sent</option>
+                                <option value="CheckedIn">Checked In</option>
+                            </select>
+                        </div>
+                    </div>
 
-        <div class="d-flex gap-2">
-            <button class="btn btn-success" @onclick="SaveEdit">
-                <i class="bi bi-check-circle"></i> Save Changes
-            </button>
-            <button class="btn btn-secondary" @onclick="CancelEdit">
-                <i class="bi bi-x-circle"></i> Cancel
-            </button>
+                    <div class="row">
+                        <div class="col-md-12 mb-3">
+                            <label class="form-label"><strong>Type:</strong></label>
+                            <input class="form-control" value="@editingModel.Type" disabled />
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="CancelEdit">
+                        <i class="bi bi-x-circle"></i> Cancel
+                    </button>
+                    <button class="btn btn-success" @onclick="SaveEdit">
+                        <i class="bi bi-check-circle"></i> Save Changes
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 }
