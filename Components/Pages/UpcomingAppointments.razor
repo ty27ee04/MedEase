@@ -1,0 +1,355 @@
+@page "/upcoming-appointments"
+@rendermode InteractiveServer
+@inject NotificationService NotificationService
+@using HealthTech.Services
+
+<PageTitle>Upcoming Appointments</PageTitle>
+
+<h1>Upcoming Appointments</h1>
+<p class="text-muted">Manage and track all scheduled future appointments</p>
+
+@if (isProcessing)
+{
+    <div class="alert alert-info">
+        <span class="spinner-border spinner-border-sm me-2"></span>
+        Processing...
+    </div>
+}
+
+@if (!string.IsNullOrEmpty(message))
+{
+    <div class="alert @(isError ? "alert-danger" : "alert-success") alert-dismissible fade show">
+        @message
+        <button type="button" class="btn-close" @onclick="() => message = string.Empty"></button>
+    </div>
+}
+
+@if (isEditing)
+{
+    <div class="card p-4 mb-4 border-primary shadow-sm">
+        <h4>Edit Appointment #@editingModel.AppointmentID</h4>
+        
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label><strong>Patient:</strong></label>
+                <input class="form-control" value="@editingModel.PatientName" disabled />
+            </div>
+
+            <div class="col-md-6 mb-3">
+                <label><strong>Doctor:</strong></label>
+                <input class="form-control" value="@editingModel.DoctorName" disabled />
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label><strong>Date & Time:</strong></label>
+                <input type="datetime-local" class="form-control" @bind="editingDateTime" />
+            </div>
+
+            <div class="col-md-6 mb-3">
+                <label><strong>Status:</strong></label>
+                <select class="form-control" @bind="editingModel.Status">
+                    <option value="Confirmed">Confirmed</option>
+                    <option value="Pending">Pending</option>
+                    <option value="Cancelled">Cancelled</option>
+                    <option value="Completed">Completed</option>
+                    <option value="ReminderSent">Reminder Sent</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="d-flex gap-2">
+            <button class="btn btn-success" @onclick="SaveEdit">
+                <i class="bi bi-check-circle"></i> Save Changes
+            </button>
+            <button class="btn btn-secondary" @onclick="CancelEdit">
+                <i class="bi bi-x-circle"></i> Cancel
+            </button>
+        </div>
+    </div>
+}
+
+<div class="card shadow-sm">
+    <div class="card-body">
+        @if (appointments.Count == 0)
+        {
+            <div class="text-center py-5">
+                <i class="bi bi-calendar-x" style="font-size: 3rem; color: #ccc;"></i>
+                <p class="mt-3 text-muted">No upcoming appointments found</p>
+            </div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th>ID</th>
+                            <th>Patient</th>
+                            <th>Doctor</th>
+                            <th>Date & Time</th>
+                            <th>Type</th>
+                            <th>Status</th>
+                            <th>Time Until</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var appt in appointments)
+                        {
+                            var timeUntil = appt.DateTime - DateTime.Now;
+                            var hoursUntil = timeUntil.TotalHours;
+                            
+                            <tr>
+                                <td>@appt.AppointmentID</td>
+                                <td>
+                                    <strong>@appt.PatientName</strong>
+                                </td>
+                                <td>@appt.DoctorName</td>
+                                <td>
+                                    <div>@appt.DateTime.ToString("dd MMM yyyy")</div>
+                                    <small class="text-muted">@appt.DateTime.ToString("hh:mm tt")</small>
+                                </td>
+                                <td>
+                                    <span class="badge @(appt.Type == "Online" ? "bg-info" : "bg-primary")">
+                                        @appt.Type
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="badge @GetStatusBadgeClass(appt.Status)">
+                                        @appt.Status
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="@GetTimeUntilClass(hoursUntil)">
+                                        @GetTimeUntilText(timeUntil)
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="d-flex gap-1 flex-wrap">
+                                        <button class="btn btn-sm btn-outline-primary" 
+                                                @onclick="() => EditAppointment(appt)">
+                                            <i class="bi bi-pencil me-1"></i>Edit
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-info" 
+                                                @onclick="() => ResendReminder(appt)"
+                                                disabled="@isProcessing">
+                                            <i class="bi bi-bell me-1"></i>Remind
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-warning" 
+                                                @onclick="() => CancelAppointment(appt)">
+                                            <i class="bi bi-x-circle me-1"></i>Cancel
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-danger" 
+                                                @onclick="() => DeleteAppointment(appt.AppointmentID)"
+                                                @onclick:preventDefault="true"
+                                                disabled="@isProcessing">
+                                            <i class="bi bi-trash me-1"></i>Delete
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private List<AppointmentModel> appointments = new List<AppointmentModel>();
+    private bool isEditing = false;
+    private bool isProcessing = false;
+    private bool isError = false;
+    private string message = "";
+    
+    private AppointmentModel editingModel = new AppointmentModel();
+    private DateTime editingDateTime = DateTime.Now;
+
+    protected override void OnInitialized()
+    {
+        LoadData();
+    }
+
+    private void LoadData()
+    {
+        appointments = DatabaseManager.GetInstance().GetUpcomingAppointments();
+    }
+
+    private void EditAppointment(AppointmentModel appt)
+    {
+        editingModel = new AppointmentModel
+        {
+            AppointmentID = appt.AppointmentID,
+            PatientID = appt.PatientID,
+            DoctorID = appt.DoctorID,
+            PatientName = appt.PatientName,
+            DoctorName = appt.DoctorName,
+            Status = appt.Status,
+            Type = appt.Type,
+            DateTime = appt.DateTime
+        };
+        editingDateTime = appt.DateTime;
+        isEditing = true;
+    }
+
+    private async Task SaveEdit()
+    {
+        isProcessing = true;
+        isError = false;
+        message = "";
+        
+        try
+        {
+            editingModel.DateTime = editingDateTime;
+            DatabaseManager.GetInstance().UpdateAppointment(editingModel);
+            
+            message = $"✅ Appointment #{editingModel.AppointmentID} updated successfully";
+            isError = false;
+            isEditing = false;
+            LoadData();
+        }
+        catch (Exception ex)
+        {
+            message = $"❌ Error: {ex.Message}";
+            isError = true;
+        }
+        finally
+        {
+            isProcessing = false;
+            StateHasChanged();
+        }
+    }
+
+    private void CancelEdit()
+    {
+        isEditing = false;
+        message = "";
+    }
+
+    private async Task ResendReminder(AppointmentModel appt)
+    {
+        isProcessing = true;
+        isError = false;
+        message = "";
+        
+        try
+        {
+            var db = DatabaseManager.GetInstance();
+            var patient = db.GetUserById(appt.PatientID);
+            
+            if (patient == null)
+            {
+                throw new Exception("Patient not found");
+            }
+
+            if (string.IsNullOrEmpty(patient.Email) || string.IsNullOrEmpty(patient.PhoneNumber))
+            {
+                throw new Exception("Patient contact information is missing");
+            }
+
+            var timeUntil = appt.DateTime - DateTime.Now;
+            var hoursUntil = (int)timeUntil.TotalHours;
+
+            await NotificationService.SendAppointmentReminderAsync(
+                patientName: patient.Name,
+                patientEmail: patient.Email,
+                patientPhone: patient.PhoneNumber,
+                doctorName: appt.DoctorName,
+                appointmentDate: appt.DateTime,
+                appointmentType: appt.Type,
+                hoursBeforeAppointment: hoursUntil > 0 ? hoursUntil : 0
+            );
+
+            message = $"✅ Reminder sent to {patient.Name} (Email & WhatsApp)";
+            isError = false;
+        }
+        catch (Exception ex)
+        {
+            message = $"❌ Error sending reminder: {ex.Message}";
+            isError = true;
+        }
+        finally
+        {
+            isProcessing = false;
+            StateHasChanged();
+        }
+    }
+
+    private void CancelAppointment(AppointmentModel appt)
+    {
+        try
+        {
+            appt.Status = "Cancelled";
+            DatabaseManager.GetInstance().UpdateAppointment(appt);
+            
+            message = $"✅ Appointment #{appt.AppointmentID} has been cancelled";
+            isError = false;
+            LoadData();
+        }
+        catch (Exception ex)
+        {
+            message = $"❌ Error: {ex.Message}";
+            isError = true;
+        }
+        
+        StateHasChanged();
+    }
+
+    private void DeleteAppointment(int id)
+    {
+        isProcessing = true;
+        
+        try
+        {
+            DatabaseManager.GetInstance().DeleteAppointment(id);
+            message = $"✅ Appointment #{id} deleted successfully";
+            isError = false;
+            LoadData();
+        }
+        catch (Exception ex)
+        {
+            message = $"❌ Error deleting appointment: {ex.Message}";
+            isError = true;
+        }
+        finally
+        {
+            isProcessing = false;
+            StateHasChanged();
+        }
+    }
+
+    private string GetStatusBadgeClass(string status)
+    {
+        return status switch
+        {
+            "Confirmed" => "bg-success",
+            "Pending" => "bg-warning",
+            "Cancelled" => "bg-danger",
+            "Completed" => "bg-secondary",
+            "ReminderSent" => "bg-info",
+            _ => "bg-secondary"
+        };
+    }
+
+    private string GetTimeUntilClass(double hoursUntil)
+    {
+        if (hoursUntil < 2) return "badge bg-danger";
+        if (hoursUntil < 24) return "badge bg-warning";
+        return "badge bg-success";
+    }
+
+    private string GetTimeUntilText(TimeSpan timeUntil)
+    {
+        if (timeUntil.TotalHours < 1)
+            return $"{(int)timeUntil.TotalMinutes}m";
+        if (timeUntil.TotalHours < 24)
+            return $"{(int)timeUntil.TotalHours}h {timeUntil.Minutes}m";
+        if (timeUntil.TotalDays < 7)
+            return $"{(int)timeUntil.TotalDays}d {timeUntil.Hours}h";
+        
+        return $"{(int)timeUntil.TotalDays} days";
+    }
+}
