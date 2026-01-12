@@ -1,3 +1,0 @@
-﻿<Project>
-  <Import Project="..\build\HealthTech.props" />
-</Project>
