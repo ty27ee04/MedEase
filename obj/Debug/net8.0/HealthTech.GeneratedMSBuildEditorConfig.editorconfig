@@ -54,6 +54,10 @@ build_metadata.AdditionalFiles.CssScope =
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xQYXRpZW50UmVjb3Jkcy5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = 
 
+[C:/xampp/htdocs/MedEase/Components/Pages/RecordsList.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xSZWNvcmRzTGlzdC5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
 [C:/xampp/htdocs/MedEase/Components/Pages/Weather.razor]
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xXZWF0aGVyLnJhem9y
 build_metadata.AdditionalFiles.CssScope = 

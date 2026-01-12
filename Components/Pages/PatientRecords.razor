@@ -8,10 +8,10 @@
 <p>This module uses the <strong>Composite Pattern</strong> to manage hierarchical records.</p>
 
 <div class="row">
-    <div class="col-md-6">
+    <div class="col-md-8">
         <div class="card">
             <div class="card-header bg-primary text-white">
-                Patient: John Doe (ID: P-90210)
+                <strong>Patient: @selectedPatientName (ID: @selectedPatientId)</strong>
             </div>
             <div class="card-body">
                 @((MarkupString)recordsHtml)
@@ -19,46 +19,199 @@
         </div>
     </div>
     
-    <div class="col-md-6">
+    <div class="col-md-4">
+        <div class="card p-3 mb-3">
+            <h5>Load Records</h5>
+            <button class="btn btn-success btn-block mb-2" @onclick="LoadFullHistory">📂 Load Full History</button>
+            <button class="btn btn-info btn-block mb-2" @onclick="LoadSampleHierarchy">📋 Load Sample Data</button>
+        </div>
+
         <div class="card p-3">
-            <h5>Manage Records</h5>
-            <button class="btn btn-success mb-2" @onclick="LoadFullHistory">Load Full History</button>
-            <button class="btn btn-warning mb-2" @onclick="LoadRecentOnly">Load Recent Only</button>
+            <h5>Add New Record</h5>
+            <div class="form-group mb-2">
+                <label>Title</label>
+                <input class="form-control" @bind="newRecordTitle" placeholder="e.g., Blood Test Results" />
+            </div>
+            <div class="form-group mb-2">
+                <label>Details</label>
+                <textarea class="form-control" @bind="newRecordDetails" placeholder="Details..." rows="3"></textarea>
+            </div>
+            <div class="form-group mb-2">
+                <label>Type</label>
+                <select class="form-control" @bind="newRecordType">
+                    <option value="File">📄 File (Leaf)</option>
+                    <option value="Folder">📂 Folder (Composite)</option>
+                </select>
+            </div>
+            <div class="form-group mb-3">
+                <label>Parent Folder ID (optional)</label>
+                <input class="form-control" type="number" @bind="newRecordParentId" placeholder="Leave empty for root" />
+            </div>
+            <button class="btn btn-primary btn-block" @onclick="AddNewRecord">➕ Add Record</button>
         </div>
     </div>
 </div>
 
+@if (!string.IsNullOrEmpty(statusMessage))
+{
+    <div class="alert alert-info mt-3">@statusMessage</div>
+}
+
 @code {
-    private string recordsHtml = "<em>Click a button to load records...</em>";
+    private int selectedPatientId = 2; // Default patient for demo
+    private string selectedPatientName = "John Doe";
+    private string recordsHtml = "<em>Click 'Load Full History' to view records...</em>";
+    private string statusMessage = "";
+
+    // Form fields for adding new records
+    private string newRecordTitle = "";
+    private string newRecordDetails = "";
+    private string newRecordType = "File";
+    private int? newRecordParentId = null;
 
     private void LoadFullHistory()
     {
-        // 1. Get Flat List from SQL
-        var dbRecords = DatabaseManager.GetInstance().GetPatientRecords(2); // Assuming Patient ID 2 for demo
-
-        // 2. Build the Tree (Simplified)
-        RecordFolder root = new RecordFolder("Medical History (From DB)");
-
-        foreach (var rec in dbRecords)
+        try
         {
-            // If it has no parent, add to root
-            if (rec.ParentFolderID == null) 
+            // 1. Get all records from database
+            var dbRecords = DatabaseManager.GetInstance().GetPatientRecords(selectedPatientId);
+
+            if (dbRecords.Count == 0)
             {
-                if (rec.RecordType == "Folder")
-                    root.Add(new RecordFolder(rec.Title));
-                else
-                    root.Add(new SingleRecord(rec.Title));
+                recordsHtml = "<em>No records found for this patient.</em>";
+                return;
             }
-            // Note: A full recursive builder is complex, 
-            // but this proves you are reading from the real table!
+
+            // 2. Build the hierarchical tree using recursive Composite pattern
+            RecordFolder root = BuildRecordTree(dbRecords);
+
+            // 3. Generate HTML
+            recordsHtml = root.GetHtmlSummary(0);
+            statusMessage = $"✅ Loaded {dbRecords.Count} records from database.";
         }
-        recordsHtml = root.GetHtmlSummary(0);
+        catch (Exception ex)
+        {
+            recordsHtml = $"<em style='color:red;'>Error loading records: {ex.Message}</em>";
+            statusMessage = "❌ Error loading records.";
+        }
     }
 
-    private void LoadRecentOnly()
+    private RecordFolder BuildRecordTree(List<RecordModel> allRecords)
     {
-        RecordFolder root = new RecordFolder("Recent Records");
-        root.Add(new SingleRecord("General Checkup - Jan 10th"));
+        RecordFolder root = new RecordFolder("📋 Complete Medical History");
+        
+        // Dictionary to store folders by their RecordID for quick lookup
+        Dictionary<int, RecordFolder> folderMap = new Dictionary<int, RecordFolder>();
+        
+        // First pass: Create all folders and single records
+        foreach (var record in allRecords)
+        {
+            if (record.RecordType == "Folder")
+            {
+                var folder = new RecordFolder($"{record.Title} (ID: {record.RecordID})");
+                folderMap[record.RecordID] = folder;
+            }
+        }
+        
+        // Second pass: Build the hierarchy
+        foreach (var record in allRecords)
+        {
+            MedicalComponent component;
+            
+            if (record.RecordType == "Folder")
+            {
+                component = folderMap[record.RecordID];
+            }
+            else
+            {
+                component = new SingleRecord($"{record.Title} - {record.Details}");
+            }
+            
+            // Add to parent or root
+            if (record.ParentFolderID.HasValue && folderMap.ContainsKey(record.ParentFolderID.Value))
+            {
+                folderMap[record.ParentFolderID.Value].Add(component);
+            }
+            else
+            {
+                root.Add(component);
+            }
+        }
+        
+        return root;
+    }
+
+    private void LoadSampleHierarchy()
+    {
+        // Demonstrate Composite Pattern with hardcoded sample data
+        RecordFolder root = new RecordFolder("📋 Sample Medical Records");
+        
+        // Create main folders (Composites)
+        RecordFolder labResults = new RecordFolder("🧪 Laboratory Results");
+        labResults.Add(new SingleRecord("Blood Test - Hemoglobin: 14.5 g/dL"));
+        labResults.Add(new SingleRecord("Urine Analysis - Normal"));
+        labResults.Add(new SingleRecord("Lipid Panel - Cholesterol: 180 mg/dL"));
+        
+        RecordFolder imaging = new RecordFolder("🩻 Imaging Reports");
+        imaging.Add(new SingleRecord("X-Ray Chest - Clear"));
+        imaging.Add(new SingleRecord("MRI Brain - No abnormalities"));
+        
+        RecordFolder prescriptions = new RecordFolder("💊 Prescriptions");
+        
+        RecordFolder currentMeds = new RecordFolder("Current Medications");
+        currentMeds.Add(new SingleRecord("Metformin 500mg - Twice daily"));
+        currentMeds.Add(new SingleRecord("Lisinopril 10mg - Once daily"));
+        
+        RecordFolder pastMeds = new RecordFolder("Past Medications");
+        pastMeds.Add(new SingleRecord("Amoxicillin 500mg - Completed"));
+        
+        prescriptions.Add(currentMeds);
+        prescriptions.Add(pastMeds);
+        
+        // Add all to root
+        root.Add(labResults);
+        root.Add(imaging);
+        root.Add(prescriptions);
+        root.Add(new SingleRecord("📅 General Checkup - Jan 10, 2026 - All vitals normal"));
+        
         recordsHtml = root.GetHtmlSummary(0);
+        statusMessage = "✅ Sample hierarchical data loaded (demonstrating Composite Pattern).";
+    }
+
+    private void AddNewRecord()
+    {
+        if (string.IsNullOrWhiteSpace(newRecordTitle))
+        {
+            statusMessage = "❌ Please enter a title.";
+            return;
+        }
+
+        try
+        {
+            var newRecord = new RecordModel
+            {
+                PatientID = selectedPatientId,
+                ParentFolderID = newRecordParentId,
+                RecordType = newRecordType,
+                Title = newRecordTitle,
+                Details = newRecordDetails
+            };
+
+            DatabaseManager.GetInstance().AddPatientRecord(newRecord);
+            
+            statusMessage = $"✅ Added new {newRecordType}: '{newRecordTitle}'";
+            
+            // Clear form
+            newRecordTitle = "";
+            newRecordDetails = "";
+            newRecordParentId = null;
+            
+            // Reload to show the new record
+            LoadFullHistory();
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"❌ Error adding record: {ex.Message}";
+        }
     }
 }
