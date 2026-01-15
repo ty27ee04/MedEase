@@ -1,0 +1,209 @@
+@page "/receptionist-dashboard"
+@rendermode InteractiveServer
+@using HealthTech.Services
+@using System.ComponentModel.DataAnnotations
+@inject NavigationManager NavigationManager
+@inject UserSession UserSession
+
+<PageTitle>Receptionist Dashboard</PageTitle>
+
+<div class="container mt-4">
+    <h1 class="mb-4">👩‍💼 Receptionist Dashboard</h1>
+
+    <!-- Tabs -->
+    <ul class="nav nav-tabs mb-3">
+        <li class="nav-item">
+            <a class="nav-link @(activeTab == "appointments" ? "active" : "")"
+                @onclick='() => activeTab = "appointments"' style="cursor:pointer">
+                📅 Manage Appointments
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link @(activeTab == "register" ? "active" : "")" @onclick='() => activeTab = "register"'
+                style="cursor:pointer">
+                ➕ Register New Patient
+            </a>
+        </li>
+    </ul>
+
+    <!-- ================= APPOINTMENTS ================= -->
+    @if (activeTab == "appointments")
+    {
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0">📋 Appointment Management</h4>
+            </div>
+            <div class="card-body">
+                @if (appointments.Count == 0)
+                {
+                    <div class="alert alert-info">No appointments found.</div>
+                }
+                else
+                {
+                    <table class="table table-striped">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>ID</th>
+                                <th>Patient</th>
+                                <th>Doctor</th>
+                                <th>Date</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var appt in appointments)
+                            {
+                                <tr>
+                                    <td>@appt.AppointmentID</td>
+                                    <td>@appt.PatientName</td>
+                                    <td>@appt.DoctorName</td>
+                                    <td>@appt.DateTime</td>
+                                    <td>@appt.Status</td>
+                                    <td>
+                                        <button class="btn btn-danger btn-sm"
+                                            @onclick="() => DeleteAppointment(appt.AppointmentID)">
+                                            🗑️ Delete
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+            </div>
+        </div>
+    }
+
+    <!-- ================= REGISTER PATIENT ================= -->
+    @if (activeTab == "register")
+    {
+        <div class="card">
+            <div class="card-header bg-success text-white">
+                <h4 class="mb-0">➕ Register New Patient</h4>
+            </div>
+
+            <div class="card-body">
+
+                <!-- 🔴 THIS IS THE IMPORTANT FIX -->
+                <EditForm Model="newPatient" OnValidSubmit="RegisterNewPatient">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary />
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Full Name</label>
+                            <InputText class="form-control" @bind-Value="newPatient.Name" />
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">Email</label>
+                            <InputText class="form-control" @bind-Value="newPatient.Email" />
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Password</label>
+                            <InputText type="password" class="form-control" @bind-Value="newPatient.Password" />
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">Phone</label>
+                            <InputText class="form-control" @bind-Value="newPatient.Phone" />
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Age</label>
+                            <InputNumber class="form-control" @bind-Value="newPatient.Age" />
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">Gender</label>
+                            <InputSelect class="form-select" @bind-Value="newPatient.Gender">
+                                <option value="">-- Select --</option>
+                                <option>Male</option>
+                                <option>Female</option>
+                                <option>Other</option>
+                            </InputSelect>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-success btn-lg">
+                        ✅ Register Patient
+                    </button>
+                </EditForm>
+
+                @if (!string.IsNullOrEmpty(registerMessage))
+                {
+                    <div class="alert alert-info mt-3">
+                        @registerMessage
+                    </div>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private string activeTab = "appointments";
+
+    private List<AppointmentModel> appointments = new();
+
+    protected override void OnInitialized()
+    {
+        var db = DatabaseManager.GetInstance();
+        appointments = db.GetAllAppointments();
+    }
+
+    private void DeleteAppointment(int id)
+    {
+        var db = DatabaseManager.GetInstance();
+        db.DeleteAppointment(id);
+        appointments = db.GetAllAppointments();
+    }
+
+    // ================= REGISTER =================
+
+    private PatientRegistration newPatient = new();
+    private string registerMessage = "";
+
+    private async Task RegisterNewPatient()
+    {
+        Console.WriteLine("REGISTER CLICKED"); // debug proof
+
+        var db = DatabaseManager.GetInstance();
+
+        int id = db.RegisterPatient(
+        newPatient.Name,
+        newPatient.Email,
+        newPatient.Password,
+        newPatient.Phone,
+        newPatient.Age,
+        newPatient.Gender
+        );
+
+        registerMessage = $"✅ Patient registered successfully. ID: {id}";
+        newPatient = new PatientRegistration();
+    }
+
+    private class PatientRegistration
+    {
+        [Required]
+        public string Name { get; set; } = "";
+
+        [Required, EmailAddress]
+        public string Email { get; set; } = "";
+
+        [Required]
+        public string Password { get; set; } = "";
+
+        [Required]
+        public string Phone { get; set; } = "";
+
+        public int? Age { get; set; }
+        public string Gender { get; set; } = "";
+    }
+}

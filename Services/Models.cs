@@ -7,7 +7,11 @@ namespace HealthTech.Services
     {
         public int UserID { get; set; }
         public string Name { get; set; } = "";
-        public string Role { get; set; } = ""; // 'Doctor', 'Patient'
+        public string Role { get; set; } = ""; // 'Doctor', 'Patient', 'Receptionist'
+        public string Email { get; set; } = "";
+        public string Phone { get; set; } = "";
+        public int? Age { get; set; }
+        public string Gender { get; set; } = "";
     }
 
     // Matches the 'Room' table
