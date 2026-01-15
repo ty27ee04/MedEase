@@ -98,18 +98,49 @@ public void AddAppointment(AppointmentModel appt)
             return list;
         }
 
-        // 3. UPDATE (Updated: Uses 'AppointmentID' and 'Status')
+        // 3. UPDATE (Updated: Uses 'AppointmentID' and supports datetime changes)
         public void UpdateAppointment(AppointmentModel appt)
         {
             using (var conn = new MySqlConnection(connectionString))
             {
                 conn.Open();
-                string sql = "UPDATE Appointment SET status=@status WHERE appointmentID=@id";
+                string sql = "UPDATE Appointment SET status=@status, dateTime=@datetime WHERE appointmentID=@id";
                 
                 using (var cmd = new MySqlCommand(sql, conn))
                 {
                     cmd.Parameters.AddWithValue("@status", appt.Status);
-                    cmd.Parameters.AddWithValue("@id", appt.AppointmentID); // Was 'Id'
+                    cmd.Parameters.AddWithValue("@datetime", appt.DateTime);
+                    cmd.Parameters.AddWithValue("@id", appt.AppointmentID);
+                    cmd.ExecuteNonQuery();
+                }
+            }
+        }
+
+        // 3b. UPDATE APPOINTMENT DETAILS (For Receptionist - Change Doctor, Status, DateTime, Room)
+        public void UpdateAppointmentDetails(int appointmentId, int? newDoctorId, string? newStatus, DateTime? newDateTime, int? newRoomId)
+        {
+            using (var conn = new MySqlConnection(connectionString))
+            {
+                conn.Open();
+                
+                // Build dynamic SQL based on what needs to be updated
+                List<string> updates = new List<string>();
+                if (newDoctorId.HasValue) updates.Add("doctorID=@doctorId");
+                if (!string.IsNullOrEmpty(newStatus)) updates.Add("status=@status");
+                if (newDateTime.HasValue) updates.Add("dateTime=@dateTime");
+                if (newRoomId.HasValue) updates.Add("roomID=@roomId");
+                
+                if (updates.Count == 0) return; // Nothing to update
+                
+                string sql = $"UPDATE Appointment SET {string.Join(", ", updates)} WHERE appointmentID=@id";
+                
+                using (var cmd = new MySqlCommand(sql, conn))
+                {
+                    cmd.Parameters.AddWithValue("@id", appointmentId);
+                    if (newDoctorId.HasValue) cmd.Parameters.AddWithValue("@doctorId", newDoctorId.Value);
+                    if (!string.IsNullOrEmpty(newStatus)) cmd.Parameters.AddWithValue("@status", newStatus);
+                    if (newDateTime.HasValue) cmd.Parameters.AddWithValue("@dateTime", newDateTime.Value);
+                    if (newRoomId.HasValue) cmd.Parameters.AddWithValue("@roomId", newRoomId.Value);
                     cmd.ExecuteNonQuery();
                 }
             }
@@ -243,6 +274,35 @@ public void AddAppointment(AppointmentModel appt)
         public List<User> GetAllDoctors()
         {
             return GetUsersByRole("Doctor");
+        }
+
+        // HELPER: Get User by ID with contact info (for notifications)
+        public User? GetUserById(int userId)
+        {
+            using (var conn = new MySqlConnection(connectionString))
+            {
+                conn.Open();
+                string sql = "SELECT UserID, Name, Role, Email, Phone FROM User WHERE UserID = @id";
+                using (var cmd = new MySqlCommand(sql, conn))
+                {
+                    cmd.Parameters.AddWithValue("@id", userId);
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        if (reader.Read())
+                        {
+                            return new User
+                            {
+                                UserID = Convert.ToInt32(reader["UserID"]),
+                                Name = reader["Name"].ToString(),
+                                Role = reader["Role"].ToString(),
+                                Email = reader["Email"].ToString(),
+                                PhoneNumber = reader["Phone"].ToString()
+                            };
+                        }
+                    }
+                }
+            }
+            return null;
         }
 
         // 2. HELPER: Get Available Rooms
@@ -453,6 +513,317 @@ public void AddAppointment(AppointmentModel appt)
                 }
             }
             return null; // Login failed
+        }
+
+        // --- WORKING TIME & AVAILABILITY METHODS ---
+
+        // Get doctor's working times
+        public List<WorkingTime> GetDoctorWorkingTimes(int doctorId)
+        {
+            var list = new List<WorkingTime>();
+            using (var conn = new MySqlConnection(connectionString))
+            {
+                conn.Open();
+                string sql = @"SELECT wt.*, u.Name as DoctorName 
+                             FROM WorkingTime wt
+                             JOIN User u ON wt.doctorID = u.userID
+                             WHERE wt.doctorID = @doctorId
+                             ORDER BY wt.date, wt.startTime";
+                
+                using (var cmd = new MySqlCommand(sql, conn))
+                {
+                    cmd.Parameters.AddWithValue("@doctorId", doctorId);
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            list.Add(new WorkingTime
+                            {
+                                WorkingTimeID = Convert.ToInt32(reader["workingTimeID"]),
+                                DoctorID = Convert.ToInt32(reader["doctorID"]),
+                                StartTime = (TimeSpan)reader["startTime"],
+                                EndTime = (TimeSpan)reader["endTime"],
+                                Date = reader["date"] == DBNull.Value ? null : Convert.ToDateTime(reader["date"]),
+                                Day = reader["day"].ToString() ?? "",
+                                Type = reader["type"].ToString() ?? "",
+                                DoctorName = reader["DoctorName"].ToString() ?? ""
+                            });
+                        }
+                    }
+                }
+            }
+            return list;
+        }
+
+        // Get available time slots for a doctor on a specific date
+        public List<TimeSlot> GetAvailableTimeSlots(int doctorId, DateTime date, int slotDurationMinutes = 30)
+        {
+            var slots = new List<TimeSlot>();
+            var dayName = date.DayOfWeek.ToString();
+
+            using (var conn = new MySqlConnection(connectionString))
+            {
+                conn.Open();
+
+                // 1. Check if doctor has specific date override (on-leave or off-day)
+                // This checks for exact date match regardless of startTime/endTime values
+                string checkSpecificDate = @"SELECT type FROM WorkingTime 
+                                           WHERE doctorID = @doctorId 
+                                           AND date = @date";
+                
+                using (var cmd = new MySqlCommand(checkSpecificDate, conn))
+                {
+                    cmd.Parameters.AddWithValue("@doctorId", doctorId);
+                    cmd.Parameters.AddWithValue("@date", date.Date);
+                    
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        if (reader.Read())
+                        {
+                            string type = reader["type"].ToString();
+                            if (type == "on leave" || type == "off day")
+                            {
+                                // Doctor is not available on this date
+                                return slots; // Empty list
+                            }
+                        }
+                    }
+                }
+
+                // 2. Get doctor's regular working hours for this day
+                string getWorkingHours = @"SELECT * FROM WorkingTime 
+                                         WHERE doctorID = @doctorId 
+                                         AND day = @day 
+                                         AND type = 'Working'
+                                         AND (date IS NULL OR date = @date)
+                                         ORDER BY date DESC LIMIT 1";
+                
+                TimeSpan? startTime = null;
+                TimeSpan? endTime = null;
+
+                using (var cmd = new MySqlCommand(getWorkingHours, conn))
+                {
+                    cmd.Parameters.AddWithValue("@doctorId", doctorId);
+                    cmd.Parameters.AddWithValue("@day", dayName);
+                    cmd.Parameters.AddWithValue("@date", date.Date);
+                    
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        if (reader.Read())
+                        {
+                            startTime = (TimeSpan)reader["startTime"];
+                            endTime = (TimeSpan)reader["endTime"];
+                        }
+                    }
+                }
+
+                if (!startTime.HasValue || !endTime.HasValue)
+                {
+                    // No working hours defined for this day
+                    return slots;
+                }
+
+                // 3. Get existing appointments for this doctor on this date (including next day for overnight shifts)
+                var bookedTimes = new List<DateTime>();
+                string getAppointments = @"SELECT dateTime FROM Appointment 
+                                         WHERE doctorID = @doctorId 
+                                         AND (DATE(dateTime) = @date OR DATE(dateTime) = DATE_ADD(@date, INTERVAL 1 DAY))
+                                         AND status NOT IN ('Cancelled', 'Completed')";
+                
+                using (var cmd = new MySqlCommand(getAppointments, conn))
+                {
+                    cmd.Parameters.AddWithValue("@doctorId", doctorId);
+                    cmd.Parameters.AddWithValue("@date", date.Date);
+                    
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            bookedTimes.Add(Convert.ToDateTime(reader["dateTime"]));
+                        }
+                    }
+                }
+
+                // 4. Generate time slots (handles overnight shifts)
+                var currentTime = date.Date + startTime.Value;
+                var endDateTime = date.Date + endTime.Value;
+                
+                // If endTime is less than or equal to startTime, it means the shift crosses midnight
+                bool isOvernightShift = endTime.Value <= startTime.Value;
+                
+                if (isOvernightShift)
+                {
+                    // For overnight shifts, we need to check if we're showing:
+                    // - The first part (e.g., Sunday 17:00 to 23:59) OR
+                    // - The second part (e.g., Monday 00:00 to 04:00)
+                    
+                    // Show only the portion on the selected date (e.g., 17:00 to 23:30)
+                    endDateTime = date.Date.AddDays(1); // End at midnight for the start day
+                }
+                else
+                {
+                    // Normal shift (not overnight), check if we should show overnight portion from previous day
+                    var previousDay = date.AddDays(-1);
+                    var previousDayName = previousDay.DayOfWeek.ToString();
+                    
+                    string checkPreviousDayShift = @"SELECT startTime, endTime FROM WorkingTime 
+                                                    WHERE doctorID = @doctorId 
+                                                    AND day = @previousDay 
+                                                    AND type = 'Working'
+                                                    AND (date IS NULL OR date = @previousDate)
+                                                    ORDER BY date DESC LIMIT 1";
+                    
+                    TimeSpan? prevStartTime = null;
+                    TimeSpan? prevEndTime = null;
+                    
+                    using (var cmd = new MySqlCommand(checkPreviousDayShift, conn))
+                    {
+                        cmd.Parameters.AddWithValue("@doctorId", doctorId);
+                        cmd.Parameters.AddWithValue("@previousDay", previousDayName);
+                        cmd.Parameters.AddWithValue("@previousDate", previousDay.Date);
+                        
+                        using (var reader = cmd.ExecuteReader())
+                        {
+                            if (reader.Read())
+                            {
+                                prevStartTime = (TimeSpan)reader["startTime"];
+                                prevEndTime = (TimeSpan)reader["endTime"];
+                            }
+                        }
+                    }
+                    
+                    if (prevStartTime.HasValue && prevEndTime.HasValue && prevEndTime.Value <= prevStartTime.Value)
+                    {
+                        // Previous day has overnight shift, add the second part (e.g., 00:00 to 04:00)
+                        // First add the overnight portion from previous day
+                        var overnightCurrentTime = date.Date; // Start at midnight
+                        var overnightEndTime = date.Date + prevEndTime.Value;
+                        
+                        while (overnightCurrentTime < overnightEndTime)
+                        {
+                            var slot = new TimeSlot
+                            {
+                                DateTime = overnightCurrentTime,
+                                IsAvailable = true
+                            };
+
+                            // Check if this slot is already booked
+                            if (bookedTimes.Any(bt => bt == overnightCurrentTime))
+                            {
+                                slot.IsAvailable = false;
+                                slot.Reason = "Already booked";
+                            }
+
+                            // Don't show past time slots
+                            if (overnightCurrentTime <= DateTime.Now)
+                            {
+                                slot.IsAvailable = false;
+                                slot.Reason = "Past time";
+                            }
+
+                            slots.Add(slot);
+                            overnightCurrentTime = overnightCurrentTime.AddMinutes(slotDurationMinutes);
+                        }
+                    }
+                }
+
+                while (currentTime < endDateTime)
+                {
+                    var slot = new TimeSlot
+                    {
+                        DateTime = currentTime,
+                        IsAvailable = true
+                    };
+
+                    // Check if this slot is already booked
+                    if (bookedTimes.Any(bt => bt == currentTime))
+                    {
+                        slot.IsAvailable = false;
+                        slot.Reason = "Already booked";
+                    }
+
+                    // Don't show past time slots
+                    if (currentTime <= DateTime.Now)
+                    {
+                        slot.IsAvailable = false;
+                        slot.Reason = "Past time";
+                    }
+
+                    slots.Add(slot);
+                    currentTime = currentTime.AddMinutes(slotDurationMinutes);
+                }
+            }
+
+            return slots;
+        }
+
+        // Get upcoming appointments (future appointments)
+        public List<AppointmentModel> GetUpcomingAppointments()
+        {
+            var list = new List<AppointmentModel>();
+            using (var conn = new MySqlConnection(connectionString))
+            {
+                conn.Open();
+                string sql = @"
+                    SELECT a.appointmentID, a.patientID, a.doctorID, a.roomID, a.dateTime, a.type, a.status, a.link,
+                           p.Name AS PatientName, p.Email AS PatientEmail, p.Phone AS PatientPhone,
+                           d.Name AS DoctorName
+                    FROM Appointment a
+                    JOIN User p ON a.patientID = p.userID
+                    JOIN User d ON a.doctorID = d.userID
+                    WHERE a.dateTime >= @now
+                    AND a.status NOT IN ('Cancelled', 'Completed')
+                    ORDER BY a.dateTime ASC";
+                
+                using (var cmd = new MySqlCommand(sql, conn))
+                {
+                    cmd.Parameters.AddWithValue("@now", DateTime.Now);
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            var appt = new AppointmentModel
+                            {
+                                AppointmentID = Convert.ToInt32(reader["appointmentID"]),
+                                PatientID = Convert.ToInt32(reader["patientID"]),
+                                DoctorID = Convert.ToInt32(reader["doctorID"]),
+                                RoomID = reader["roomID"] == DBNull.Value ? null : Convert.ToInt32(reader["roomID"]),
+                                DateTime = Convert.ToDateTime(reader["dateTime"]),
+                                Type = reader["type"].ToString() ?? "",
+                                Status = reader["status"].ToString() ?? "",
+                                Link = reader["link"]?.ToString(),
+                                PatientName = reader["PatientName"].ToString() ?? "",
+                                DoctorName = reader["DoctorName"].ToString() ?? ""
+                            };
+                            list.Add(appt);
+                        }
+                    }
+                }
+            }
+            return list;
+        }
+
+        // Add working time for a doctor
+        public void AddWorkingTime(WorkingTime workingTime)
+        {
+            using (var conn = new MySqlConnection(connectionString))
+            {
+                conn.Open();
+                string sql = @"INSERT INTO WorkingTime 
+                             (doctorID, startTime, endTime, date, day, type) 
+                             VALUES (@doctorId, @start, @end, @date, @day, @type)";
+                
+                using (var cmd = new MySqlCommand(sql, conn))
+                {
+                    cmd.Parameters.AddWithValue("@doctorId", workingTime.DoctorID);
+                    cmd.Parameters.AddWithValue("@start", workingTime.StartTime);
+                    cmd.Parameters.AddWithValue("@end", workingTime.EndTime);
+                    cmd.Parameters.AddWithValue("@date", workingTime.Date.HasValue ? workingTime.Date : DBNull.Value);
+                    cmd.Parameters.AddWithValue("@day", workingTime.Day);
+                    cmd.Parameters.AddWithValue("@type", workingTime.Type);
+                    cmd.ExecuteNonQuery();
+                }
+            }
         }
     }
 }
