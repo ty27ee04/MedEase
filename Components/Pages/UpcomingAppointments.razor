@@ -435,7 +435,7 @@
         try
         {
             editingModel.DateTime = editingDateTime;
-            DatabaseManager.GetInstance().UpdateAppointment(editingModel);
+            await Task.Run(() => DatabaseManager.GetInstance().UpdateAppointment(editingModel));
             
             message = $"✅ Appointment #{editingModel.AppointmentID} updated successfully";
             isError = false;
@@ -477,7 +477,7 @@
                 throw new Exception("Patient not found");
             }
 
-            if (string.IsNullOrEmpty(patient.Email) || string.IsNullOrEmpty(patient.PhoneNumber))
+            if (string.IsNullOrEmpty(patient.Email) || string.IsNullOrEmpty(patient.Phone))
             {
                 throw new Exception("Patient contact information is missing");
             }
@@ -488,7 +488,7 @@
             await NotificationService.SendAppointmentReminderAsync(
                 patientName: patient.Name,
                 patientEmail: patient.Email,
-                patientPhone: patient.PhoneNumber,
+                patientPhone: patient.Phone,
                 doctorName: appt.DoctorName,
                 appointmentDate: appt.DateTime,
                 appointmentType: appt.Type,

@@ -147,7 +147,7 @@
     private bool isError = false;
     private bool isLoadingSlots = false;
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
         var db = DatabaseManager.GetInstance();
         patients = db.GetUsersByRole("Patient");
@@ -160,7 +160,7 @@
         if (rooms.Count > 0) selectedRoomId = rooms[0].RoomID;
         
         // Load initial time slots for selected doctor and date
-        LoadTimeSlots();
+        await LoadTimeSlots();
     }
 
     private async Task OnDoctorChanged()
@@ -248,7 +248,7 @@
             }
 
             // Validate contact information
-            if (string.IsNullOrEmpty(patient.Email) || string.IsNullOrEmpty(patient.PhoneNumber))
+            if (string.IsNullOrEmpty(patient.Email) || string.IsNullOrEmpty(patient.Phone))
             {
                 throw new Exception("Patient must have email and phone number for notifications");
             }
@@ -288,7 +288,7 @@
             await NotificationService.SendAppointmentConfirmationAsync(
                 patientName: patient.Name,
                 patientEmail: patient.Email,
-                patientPhone: patient.PhoneNumber,
+                patientPhone: patient.Phone,
                 doctorName: doctor.Name,
                 appointmentDate: newAppt.DateTime,
                 appointmentType: selectedType

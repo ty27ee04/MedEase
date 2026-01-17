@@ -7,17 +7,11 @@ namespace HealthTech.Services
     {
         public int UserID { get; set; }
         public string Name { get; set; } = "";
-<<<<<<< HEAD
         public string Role { get; set; } = ""; // 'Doctor', 'Patient', 'Receptionist'
         public string Email { get; set; } = "";
         public string Phone { get; set; } = "";
         public int? Age { get; set; }
         public string Gender { get; set; } = "";
-=======
-        public string Role { get; set; } = ""; // 'Doctor', 'Patient'
-        public string Email { get; set; } = ""; // For email notifications
-        public string PhoneNumber { get; set; } = ""; // For WhatsApp/SMS (E.164 format: +60123456789)
->>>>>>> 712a9f04b6880593d519145d9a12e85d868d9f21
     }
 
     // Matches the 'Room' table

@@ -146,36 +146,6 @@ public void AddAppointment(AppointmentModel appt)
             }
         }
 
-        // 3b. UPDATE APPOINTMENT DETAILS (For Receptionist - Change Doctor, Status, DateTime, Room)
-        public void UpdateAppointmentDetails(int appointmentId, int? newDoctorId, string? newStatus, DateTime? newDateTime, int? newRoomId)
-        {
-            using (var conn = new MySqlConnection(connectionString))
-            {
-                conn.Open();
-                
-                // Build dynamic SQL based on what needs to be updated
-                List<string> updates = new List<string>();
-                if (newDoctorId.HasValue) updates.Add("doctorID=@doctorId");
-                if (!string.IsNullOrEmpty(newStatus)) updates.Add("status=@status");
-                if (newDateTime.HasValue) updates.Add("dateTime=@dateTime");
-                if (newRoomId.HasValue) updates.Add("roomID=@roomId");
-                
-                if (updates.Count == 0) return; // Nothing to update
-                
-                string sql = $"UPDATE Appointment SET {string.Join(", ", updates)} WHERE appointmentID=@id";
-                
-                using (var cmd = new MySqlCommand(sql, conn))
-                {
-                    cmd.Parameters.AddWithValue("@id", appointmentId);
-                    if (newDoctorId.HasValue) cmd.Parameters.AddWithValue("@doctorId", newDoctorId.Value);
-                    if (!string.IsNullOrEmpty(newStatus)) cmd.Parameters.AddWithValue("@status", newStatus);
-                    if (newDateTime.HasValue) cmd.Parameters.AddWithValue("@dateTime", newDateTime.Value);
-                    if (newRoomId.HasValue) cmd.Parameters.AddWithValue("@roomId", newRoomId.Value);
-                    cmd.ExecuteNonQuery();
-                }
-            }
-        }
-
         // 4. DELETE (Updated: Uses 'AppointmentID')
         public void DeleteAppointment(int id)
         {
@@ -293,10 +263,10 @@ public void AddAppointment(AppointmentModel appt)
                             return new User
                             {
                                 UserID = Convert.ToInt32(reader["UserID"]),
-                                Name = reader["Name"].ToString(),
-                                Role = reader["Role"].ToString(),
-                                Email = reader["Email"].ToString(),
-                                PhoneNumber = reader["Phone"].ToString()
+                                Name = reader["Name"].ToString() ?? "",
+                                Role = reader["Role"].ToString() ?? "",
+                                Email = reader["Email"].ToString() ?? "",
+                                Phone = reader["Phone"].ToString() ?? ""
                             };
                         }
                     }
@@ -376,6 +346,25 @@ public void AddAppointment(AppointmentModel appt)
                     cmd.Parameters.AddWithValue("@pid", record.PatientID);
                     cmd.Parameters.AddWithValue("@parentId", record.ParentFolderID.HasValue ? (object)record.ParentFolderID.Value : DBNull.Value);
                     cmd.Parameters.AddWithValue("@type", record.RecordType);
+                    cmd.Parameters.AddWithValue("@title", record.Title);
+                    cmd.Parameters.AddWithValue("@details", record.Details ?? "");
+                    cmd.ExecuteNonQuery();
+                }
+            }
+        }
+
+        public void UpdatePatientRecord(RecordModel record)
+        {
+            using (var conn = new MySqlConnection(connectionString))
+            {
+                conn.Open();
+                string sql = @"UPDATE PatientRecord 
+                               SET title = @title, details = @details 
+                               WHERE recordID = @rid";
+                
+                using (var cmd = new MySqlCommand(sql, conn))
+                {
+                    cmd.Parameters.AddWithValue("@rid", record.RecordID);
                     cmd.Parameters.AddWithValue("@title", record.Title);
                     cmd.Parameters.AddWithValue("@details", record.Details ?? "");
                     cmd.ExecuteNonQuery();
@@ -580,7 +569,7 @@ public void AddAppointment(AppointmentModel appt)
                     {
                         if (reader.Read())
                         {
-                            string type = reader["type"].ToString();
+                            string? type = reader["type"].ToString();
                             if (type == "on leave" || type == "off day")
                             {
                                 // Doctor is not available on this date

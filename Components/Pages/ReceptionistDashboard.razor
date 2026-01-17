@@ -104,11 +104,6 @@
 
                     <div class="row mb-3">
                         <div class="col-md-6">
-                            <label class="form-label">Password</label>
-                            <InputText type="password" class="form-control" @bind-Value="newPatient.Password" />
-                        </div>
-
-                        <div class="col-md-6">
                             <label class="form-label">Phone</label>
                             <InputText class="form-control" @bind-Value="newPatient.Phone" />
                         </div>
@@ -174,18 +169,22 @@
     {
         Console.WriteLine("REGISTER CLICKED"); // debug proof
 
-        var db = DatabaseManager.GetInstance();
+        await Task.Run(() =>
+        {
+            var db = DatabaseManager.GetInstance();
 
-        int id = db.RegisterPatient(
-        newPatient.Name,
-        newPatient.Email,
-        newPatient.Password,
-        newPatient.Phone,
-        newPatient.Age,
-        newPatient.Gender
-        );
+            int id = db.RegisterPatient(
+                newPatient.Name,
+                newPatient.Email,
+                "DefaultPassword123",  // Default password - patient can change later
+                newPatient.Phone,
+                newPatient.Age,
+                newPatient.Gender
+            );
 
-        registerMessage = $"✅ Patient registered successfully. ID: {id}";
+            registerMessage = $"✅ Patient registered successfully. ID: {id}";
+        });
+        
         newPatient = new PatientRegistration();
     }
 
@@ -196,9 +195,6 @@
 
         [Required, EmailAddress]
         public string Email { get; set; } = "";
-
-        [Required]
-        public string Password { get; set; } = "";
 
         [Required]
         public string Phone { get; set; } = "";
