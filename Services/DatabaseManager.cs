@@ -84,13 +84,13 @@ public void AddAppointment(AppointmentModel appt)
                             DoctorID = Convert.ToInt32(reader["doctorID"]),
                             RoomID = reader["roomID"] == DBNull.Value ? null : Convert.ToInt32(reader["roomID"]),
                             DateTime = Convert.ToDateTime(reader["dateTime"]),
-                            Type = reader["type"].ToString(),
-                            Status = reader["status"].ToString(),
-                            Link = reader["link"].ToString(),
+                            Type = reader["type"].ToString() ?? "",
+                            Status = reader["status"].ToString() ?? "",
+                            Link = reader["link"].ToString() ?? "",
                             
                             // Populated from the JOIN aliases
-                            PatientName = reader["PatientName"].ToString(),
-                            DoctorName = reader["DoctorName"].ToString()
+                            PatientName = reader["PatientName"].ToString() ?? "",
+                            DoctorName = reader["DoctorName"].ToString() ?? ""
                         });
                     }
                 }
@@ -111,6 +111,36 @@ public void AddAppointment(AppointmentModel appt)
                     cmd.Parameters.AddWithValue("@status", appt.Status);
                     cmd.Parameters.AddWithValue("@datetime", appt.DateTime);
                     cmd.Parameters.AddWithValue("@id", appt.AppointmentID);
+                    cmd.ExecuteNonQuery();
+                }
+            }
+        }
+
+        // 3b. UPDATE APPOINTMENT DETAILS (For Receptionist - Change Doctor, Status, DateTime, Room)
+        public void UpdateAppointmentDetails(int appointmentId, int? newDoctorId, string? newStatus, DateTime? newDateTime, int? newRoomId)
+        {
+            using (var conn = new MySqlConnection(connectionString))
+            {
+                conn.Open();
+                
+                // Build dynamic SQL based on what needs to be updated
+                List<string> updates = new List<string>();
+                if (newDoctorId.HasValue) updates.Add("doctorID=@doctorId");
+                if (!string.IsNullOrEmpty(newStatus)) updates.Add("status=@status");
+                if (newDateTime.HasValue) updates.Add("dateTime=@dateTime");
+                if (newRoomId.HasValue) updates.Add("roomID=@roomId");
+                
+                if (updates.Count == 0) return; // Nothing to update
+                
+                string sql = $"UPDATE Appointment SET {string.Join(", ", updates)} WHERE appointmentID=@id";
+                
+                using (var cmd = new MySqlCommand(sql, conn))
+                {
+                    cmd.Parameters.AddWithValue("@id", appointmentId);
+                    if (newDoctorId.HasValue) cmd.Parameters.AddWithValue("@doctorId", newDoctorId.Value);
+                    if (!string.IsNullOrEmpty(newStatus)) cmd.Parameters.AddWithValue("@status", newStatus);
+                    if (newDateTime.HasValue) cmd.Parameters.AddWithValue("@dateTime", newDateTime.Value);
+                    if (newRoomId.HasValue) cmd.Parameters.AddWithValue("@roomId", newRoomId.Value);
                     cmd.ExecuteNonQuery();
                 }
             }
@@ -153,7 +183,27 @@ public void AddAppointment(AppointmentModel appt)
             using (var conn = new MySqlConnection(connectionString))
             {
                 conn.Open();
-                string sql = "SELECT UserID, Name, Role, Email, Phone FROM User WHERE Role = @role";
+                
+                // Try to get age and gender if columns exist
+                string sql = "SELECT userID, name, role, email, phone FROM User WHERE role = @role";
+                bool hasAgeGender = false;
+                
+                try
+                {
+                    string checkSql = "SELECT age, gender FROM User LIMIT 1";
+                    using (var checkCmd = new MySqlCommand(checkSql, conn))
+                    {
+                        checkCmd.ExecuteScalar();
+                        hasAgeGender = true;
+                    }
+                }
+                catch (MySqlException) { }
+                
+                if (hasAgeGender)
+                {
+                    sql = "SELECT userID, name, role, email, phone, age, gender FROM User WHERE role = @role";
+                }
+                
                 using (var cmd = new MySqlCommand(sql, conn))
                 {
                     cmd.Parameters.AddWithValue("@role", role);
@@ -161,19 +211,39 @@ public void AddAppointment(AppointmentModel appt)
                     {
                         while (reader.Read())
                         {
-                            users.Add(new User 
+                            var user = new User 
                             { 
-                                UserID = Convert.ToInt32(reader["UserID"]), 
-                                Name = reader["Name"].ToString(),
-                                Role = reader["Role"].ToString(),
-                                Email = reader["Email"].ToString(),
-                                PhoneNumber = reader["Phone"].ToString()
-                            });
+                                UserID = Convert.ToInt32(reader["userID"]), 
+                                Name = reader["name"].ToString() ?? "",
+                                Role = reader["role"].ToString() ?? "",
+                                Email = reader["email"].ToString() ?? "",
+                                Phone = reader["phone"].ToString() ?? ""
+                            };
+                            
+                            if (hasAgeGender)
+                            {
+                                user.Age = reader["age"] == DBNull.Value ? null : Convert.ToInt32(reader["age"]);
+                                user.Gender = reader["gender"].ToString() ?? "";
+                            }
+                            
+                            users.Add(user);
                         }
                     }
                 }
             }
             return users;
+        }
+
+        // 1b. HELPER: Get All Patients (For Receptionist)
+        public List<User> GetAllPatients()
+        {
+            return GetUsersByRole("Patient");
+        }
+
+        // 1c. HELPER: Get All Doctors (For Receptionist)
+        public List<User> GetAllDoctors()
+        {
+            return GetUsersByRole("Doctor");
         }
 
         // HELPER: Get User by ID with contact info (for notifications)
@@ -193,10 +263,10 @@ public void AddAppointment(AppointmentModel appt)
                             return new User
                             {
                                 UserID = Convert.ToInt32(reader["UserID"]),
-                                Name = reader["Name"].ToString(),
-                                Role = reader["Role"].ToString(),
-                                Email = reader["Email"].ToString(),
-                                PhoneNumber = reader["Phone"].ToString()
+                                Name = reader["Name"].ToString() ?? "",
+                                Role = reader["Role"].ToString() ?? "",
+                                Email = reader["Email"].ToString() ?? "",
+                                Phone = reader["Phone"].ToString() ?? ""
                             };
                         }
                     }
@@ -221,8 +291,8 @@ public void AddAppointment(AppointmentModel appt)
                         rooms.Add(new Room 
                         { 
                             RoomID = Convert.ToInt32(reader["roomID"]), 
-                            RoomNumber = reader["roomNumber"].ToString(),
-                            RoomType = reader["roomType"].ToString()
+                            RoomNumber = reader["roomNumber"].ToString() ?? "",
+                            RoomType = reader["roomType"].ToString() ?? ""
                         });
                     }
                 }
@@ -237,7 +307,29 @@ public void AddAppointment(AppointmentModel appt)
             using (var conn = new MySqlConnection(connectionString))
             {
                 conn.Open();
-                string sql = "SELECT * FROM PatientRecord WHERE patientID = @pid ORDER BY recordID";
+                
+                // Check if timestamp columns exist
+                bool hasTimestamps = false;
+                try
+                {
+                    string checkSql = "SELECT created_at, updated_at FROM PatientRecord LIMIT 1";
+                    using (var checkCmd = new MySqlCommand(checkSql, conn))
+                    {
+                        using (var checkReader = checkCmd.ExecuteReader())
+                        {
+                            hasTimestamps = true;
+                        }
+                    }
+                }
+                catch (MySqlException)
+                {
+                    hasTimestamps = false;
+                }
+                
+                string sql = hasTimestamps 
+                    ? "SELECT * FROM PatientRecord WHERE patientID = @pid ORDER BY created_at DESC"
+                    : "SELECT * FROM PatientRecord WHERE patientID = @pid ORDER BY recordID DESC";
+                    
                 using (var cmd = new MySqlCommand(sql, conn))
                 {
                     cmd.Parameters.AddWithValue("@pid", patientId);
@@ -245,15 +337,29 @@ public void AddAppointment(AppointmentModel appt)
                     {
                         while (reader.Read())
                         {
-                            list.Add(new RecordModel
+                            var record = new RecordModel
                             {
                                 RecordID = Convert.ToInt32(reader["recordID"]),
                                 PatientID = Convert.ToInt32(reader["patientID"]),
                                 ParentFolderID = reader["parentFolderID"] == DBNull.Value ? null : (int?)Convert.ToInt32(reader["parentFolderID"]),
-                                RecordType = reader["recordType"].ToString(),
-                                Title = reader["title"].ToString(),
-                                Details = reader["details"].ToString()
-                            });
+                                RecordType = reader["recordType"].ToString() ?? "",
+                                Title = reader["title"].ToString() ?? "",
+                                Details = reader["details"].ToString() ?? ""
+                            };
+                            
+                            // Set timestamps if columns exist
+                            if (hasTimestamps)
+                            {
+                                record.CreatedAt = reader["created_at"] != DBNull.Value ? Convert.ToDateTime(reader["created_at"]) : DateTime.Now;
+                                record.UpdatedAt = reader["updated_at"] != DBNull.Value ? Convert.ToDateTime(reader["updated_at"]) : DateTime.Now;
+                            }
+                            else
+                            {
+                                record.CreatedAt = DateTime.Now;
+                                record.UpdatedAt = DateTime.Now;
+                            }
+                            
+                            list.Add(record);
                         }
                     }
                 }
@@ -267,15 +373,76 @@ public void AddAppointment(AppointmentModel appt)
             using (var conn = new MySqlConnection(connectionString))
             {
                 conn.Open();
-                string sql = @"INSERT INTO PatientRecord 
-                               (patientID, parentFolderID, recordType, title, details) 
-                               VALUES (@pid, @parentId, @type, @title, @details)";
+                
+                // Check if timestamp columns exist
+                bool hasTimestamps = false;
+                try
+                {
+                    string checkSql = "SELECT created_at FROM PatientRecord LIMIT 1";
+                    using (var checkCmd = new MySqlCommand(checkSql, conn))
+                    {
+                        checkCmd.ExecuteScalar();
+                        hasTimestamps = true;
+                    }
+                }
+                catch (MySqlException)
+                {
+                    hasTimestamps = false;
+                }
+                
+                string sql = hasTimestamps
+                    ? @"INSERT INTO PatientRecord 
+                       (patientID, parentFolderID, recordType, title, details, created_at, updated_at) 
+                       VALUES (@pid, @parentId, @type, @title, @details, NOW(), NOW())"
+                    : @"INSERT INTO PatientRecord 
+                       (patientID, parentFolderID, recordType, title, details) 
+                       VALUES (@pid, @parentId, @type, @title, @details)";
                 
                 using (var cmd = new MySqlCommand(sql, conn))
                 {
                     cmd.Parameters.AddWithValue("@pid", record.PatientID);
                     cmd.Parameters.AddWithValue("@parentId", record.ParentFolderID.HasValue ? (object)record.ParentFolderID.Value : DBNull.Value);
                     cmd.Parameters.AddWithValue("@type", record.RecordType);
+                    cmd.Parameters.AddWithValue("@title", record.Title);
+                    cmd.Parameters.AddWithValue("@details", record.Details ?? "");
+                    cmd.ExecuteNonQuery();
+                }
+            }
+        }
+
+        public void UpdatePatientRecord(RecordModel record)
+        {
+            using (var conn = new MySqlConnection(connectionString))
+            {
+                conn.Open();
+                
+                // Check if timestamp columns exist
+                bool hasTimestamps = false;
+                try
+                {
+                    string checkSql = "SELECT updated_at FROM PatientRecord LIMIT 1";
+                    using (var checkCmd = new MySqlCommand(checkSql, conn))
+                    {
+                        checkCmd.ExecuteScalar();
+                        hasTimestamps = true;
+                    }
+                }
+                catch (MySqlException)
+                {
+                    hasTimestamps = false;
+                }
+                
+                string sql = hasTimestamps
+                    ? @"UPDATE PatientRecord 
+                       SET title = @title, details = @details, updated_at = NOW() 
+                       WHERE recordID = @rid"
+                    : @"UPDATE PatientRecord 
+                       SET title = @title, details = @details 
+                       WHERE recordID = @rid";
+                
+                using (var cmd = new MySqlCommand(sql, conn))
+                {
+                    cmd.Parameters.AddWithValue("@rid", record.RecordID);
                     cmd.Parameters.AddWithValue("@title", record.Title);
                     cmd.Parameters.AddWithValue("@details", record.Details ?? "");
                     cmd.ExecuteNonQuery();
@@ -321,6 +488,70 @@ public void AddAppointment(AppointmentModel appt)
             }
         }
 
+        // 1b. REGISTER PATIENT (Enhanced - For Receptionist with Full Details)
+        public int RegisterPatient(string name, string email, string password, string phone, int? age, string gender)
+        {
+            using (var conn = new MySqlConnection(connectionString))
+            {
+                conn.Open();
+                
+                // Check if age and gender columns exist, if not add them
+                try
+                {
+                    string checkSql = "SELECT age, gender FROM User LIMIT 1";
+                    using (var checkCmd = new MySqlCommand(checkSql, conn))
+                    {
+                        checkCmd.ExecuteScalar();
+                    }
+                    
+                    // Columns exist, use them
+                    string sql = @"INSERT INTO User (name, email, password, role, phone, age, gender) 
+                                   VALUES (@name, @email, @pass, 'Patient', @phone, @age, @gender)";
+                    
+                    using (var cmd = new MySqlCommand(sql, conn))
+                    {
+                        cmd.Parameters.AddWithValue("@name", name);
+                        cmd.Parameters.AddWithValue("@email", email);
+                        cmd.Parameters.AddWithValue("@pass", password);
+                        cmd.Parameters.AddWithValue("@phone", phone);
+                        cmd.Parameters.AddWithValue("@age", age.HasValue ? age.Value : (object)DBNull.Value);
+                        cmd.Parameters.AddWithValue("@gender", string.IsNullOrEmpty(gender) ? (object)DBNull.Value : gender);
+                        cmd.ExecuteNonQuery();
+                        
+                        return (int)cmd.LastInsertedId;
+                    }
+                }
+                catch (MySqlException)
+                {
+                    // Columns don't exist, add them first
+                    string alterSql = @"ALTER TABLE User 
+                                       ADD COLUMN age INT NULL,
+                                       ADD COLUMN gender VARCHAR(10) NULL";
+                    using (var alterCmd = new MySqlCommand(alterSql, conn))
+                    {
+                        alterCmd.ExecuteNonQuery();
+                    }
+                    
+                    // Now insert with age and gender
+                    string sql = @"INSERT INTO User (name, email, password, role, phone, age, gender) 
+                                   VALUES (@name, @email, @pass, 'Patient', @phone, @age, @gender)";
+                    
+                    using (var cmd = new MySqlCommand(sql, conn))
+                    {
+                        cmd.Parameters.AddWithValue("@name", name);
+                        cmd.Parameters.AddWithValue("@email", email);
+                        cmd.Parameters.AddWithValue("@pass", password);
+                        cmd.Parameters.AddWithValue("@phone", phone);
+                        cmd.Parameters.AddWithValue("@age", age.HasValue ? age.Value : (object)DBNull.Value);
+                        cmd.Parameters.AddWithValue("@gender", string.IsNullOrEmpty(gender) ? (object)DBNull.Value : gender);
+                        cmd.ExecuteNonQuery();
+                        
+                        return (int)cmd.LastInsertedId;
+                    }
+                }
+            }
+        }
+
         // 2. LOGIN (Check User)
         public User? LoginUser(string name, string password)
         {
@@ -341,8 +572,8 @@ public void AddAppointment(AppointmentModel appt)
                             return new User
                             {
                                 UserID = Convert.ToInt32(reader["userID"]),
-                                Name = reader["name"].ToString(),
-                                Role = reader["role"].ToString()
+                                Name = reader["name"].ToString() ?? "",
+                                Role = reader["role"].ToString() ?? ""
                             };
                         }
                     }
@@ -416,7 +647,7 @@ public void AddAppointment(AppointmentModel appt)
                     {
                         if (reader.Read())
                         {
-                            string type = reader["type"].ToString();
+                            string? type = reader["type"].ToString();
                             if (type == "on leave" || type == "off day")
                             {
                                 // Doctor is not available on this date
