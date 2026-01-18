@@ -7,9 +7,11 @@ namespace HealthTech.Services
     {
         public int UserID { get; set; }
         public string Name { get; set; } = "";
-        public string Role { get; set; } = ""; // 'Doctor', 'Patient'
-        public string Email { get; set; } = ""; // For email notifications
-        public string PhoneNumber { get; set; } = ""; // For WhatsApp/SMS (E.164 format: +60123456789)
+        public string Role { get; set; } = ""; // 'Doctor', 'Patient', 'Receptionist'
+        public string Email { get; set; } = "";
+        public string Phone { get; set; } = "";
+        public int? Age { get; set; }
+        public string Gender { get; set; } = "";
     }
 
     // Matches the 'Room' table
@@ -46,6 +48,8 @@ namespace HealthTech.Services
         public string RecordType { get; set; } = "File"; // 'Folder' or 'File'
         public string Title { get; set; } = "";
         public string Details { get; set; } = "";
+        public DateTime CreatedAt { get; set; }
+        public DateTime UpdatedAt { get; set; }
     }
     
     // Matches the 'WorkingTime' table for doctor availability
