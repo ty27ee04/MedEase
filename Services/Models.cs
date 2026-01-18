@@ -48,6 +48,8 @@ namespace HealthTech.Services
         public string RecordType { get; set; } = "File"; // 'Folder' or 'File'
         public string Title { get; set; } = "";
         public string Details { get; set; } = "";
+        public DateTime CreatedAt { get; set; }
+        public DateTime UpdatedAt { get; set; }
     }
     
     // Matches the 'WorkingTime' table for doctor availability

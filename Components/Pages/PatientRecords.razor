@@ -15,28 +15,65 @@
         </div>
         <div class="card-body">
             <div class="row">
-                <div class="col-md-6">
-                    <div class="input-group">
+                <div class="col-md-12">
+                    <div class="input-group mb-3">
                         <span class="input-group-text">Search</span>
                         <input type="text" class="form-control" 
-                               placeholder="Search by name or ID..." 
+                               placeholder="Type patient name or ID to search..." 
                                @bind="patientSearchQuery"
                                @bind:event="oninput"
-                               @onkeyup="FilterPatients" />
+                               @onkeyup="FilterPatients"
+                               @onfocus="() => showPatientList = true" />
                         @if (!string.IsNullOrEmpty(patientSearchQuery))
                         {
                             <button class="btn btn-outline-secondary" @onclick="ClearPatientSearch">✖</button>
                         }
+                        <button class="btn btn-primary" @onclick="ShowAllPatients">
+                            👥 View All Patients
+                        </button>
                     </div>
-                </div>
-                <div class="col-md-6">
-                    <select class="form-select" @bind="selectedPatientId" @bind:after="OnPatientSelected">
-                        <option value="0">-- Select a Patient --</option>
-                        @foreach (var patient in filteredPatients)
-                        {
-                            <option value="@patient.UserID">@patient.Name (ID: @patient.UserID)</option>
-                        }
-                    </select>
+                    
+                    @if (showPatientList && filteredPatients.Count > 0)
+                    {
+                        <div class="list-group" style="max-height: 400px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px;">
+                            @foreach (var patient in filteredPatients.Take(showAllPatientsMode ? 1000 : 10))
+                            {
+                                <button type="button" 
+                                        class="list-group-item list-group-item-action d-flex justify-content-between align-items-center @(selectedPatientId == patient.UserID ? "active" : "")"
+                                        @onclick="() => SelectPatient(patient)">
+                                    <div>
+                                        <strong>@patient.Name</strong>
+                                        <br />
+                                        <small class="@(selectedPatientId == patient.UserID ? "text-white" : "text-muted")">
+                                            ID: @patient.UserID | Email: @patient.Email | Phone: @patient.Phone
+                                        </small>
+                                    </div>
+                                    @if (selectedPatientId == patient.UserID)
+                                    {
+                                        <span class="badge bg-light text-primary">✓ Selected</span>
+                                    }
+                                </button>
+                            }
+                            @if (filteredPatients.Count > 10 && !showAllPatientsMode)
+                            {
+                                <div class="list-group-item text-center text-muted">
+                                    <small>Showing 10 of @filteredPatients.Count patients. Type more to narrow results or click "View All Patients".</small>
+                                </div>
+                            }
+                        </div>
+                    }
+                    else if (showPatientList && !string.IsNullOrEmpty(patientSearchQuery) && filteredPatients.Count == 0)
+                    {
+                        <div class="alert alert-info mb-0">
+                            No patients found matching "@patientSearchQuery"
+                        </div>
+                    }
+                    else if (string.IsNullOrEmpty(patientSearchQuery))
+                    {
+                        <div class="alert alert-info mb-0">
+                            <i class="bi bi-info-circle"></i> Start typing to search for patients...
+                        </div>
+                    }
                 </div>
             </div>
         </div>
@@ -51,10 +88,10 @@
             </div>
             <div class="card-body">
                 <div class="row">
-                    <div class="col-md-3">
+                    <div class="col-md-2">
                         <strong>Name:</strong> @currentPatient.Name
                     </div>
-                    <div class="col-md-2">
+                    <div class="col-md-1">
                         <strong>ID:</strong> @currentPatient.UserID
                     </div>
                     <div class="col-md-3">
@@ -66,7 +103,7 @@
                     <div class="col-md-1">
                         <strong>Age:</strong> @(currentPatient.Age?.ToString() ?? "N/A")
                     </div>
-                    <div class="col-md-1">
+                    <div class="col-md-3">
                         <strong>Gender:</strong> @currentPatient.Gender
                     </div>
                 </div>
@@ -77,7 +114,7 @@
         <div class="btn-group mb-3" role="group">
             <button type="button" class="btn @(viewMode == "list" ? "btn-primary" : "btn-outline-primary")" 
                     @onclick='() => viewMode = "list"'>
-                📑 List View (A-Z)
+                📑 List View (by Date)
             </button>
             <button type="button" class="btn @(viewMode == "tree" ? "btn-primary" : "btn-outline-primary")" 
                     @onclick='() => viewMode = "tree"'>
@@ -89,10 +126,10 @@
             <div class="col-md-8">
                 @if (viewMode == "list")
                 {
-                    <!-- A-Z List View -->
+                    <!-- Date-Based List View -->
                     <div class="card mb-3">
                         <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
-                            <strong>📑 Records List (A-Z)</strong>
+                            <strong>📑 Records List (by Date)</strong>
                             <div>
                                 <input type="text" class="form-control form-control-sm d-inline-block" 
                                        style="width: 200px;" 
@@ -103,20 +140,17 @@
                             </div>
                         </div>
                         <div class="card-body">
-                            <!-- Alphabet Navigation -->
+                            <!-- Date Navigation -->
                             <div class="mb-3 d-flex flex-wrap gap-1">
-                                @foreach (var letter in "ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+                                @foreach (var date in GetUniqueDates())
                                 {
-                                    var count = GetRecordCountByLetter(letter);
-                                    if (count > 0)
-                                    {
-                                        <button class="btn btn-sm @(selectedLetter == letter ? "btn-primary" : "btn-outline-primary")" 
-                                                @onclick="() => FilterByLetter(letter)">
-                                            @letter (@count)
-                                        </button>
-                                    }
+                                    var count = GetRecordCountByDate(date);
+                                    <button class="btn btn-sm @(selectedDate == date ? "btn-primary" : "btn-outline-primary")" 
+                                            @onclick="() => FilterByDate(date)">
+                                        @date.ToString("MMM dd, yyyy") (@count)
+                                    </button>
                                 }
-                                <button class="btn btn-sm @(selectedLetter == null ? "btn-success" : "btn-outline-success")" 
+                                <button class="btn btn-sm @(selectedDate == null ? "btn-success" : "btn-outline-success")" 
                                         @onclick="ShowAllRecords">All</button>
                             </div>
 
@@ -128,15 +162,17 @@
                             else
                             {
                                 <div class="list-group">
-                                    @foreach (var record in filteredRecords.OrderBy(r => r.Title))
+                                    @foreach (var record in filteredRecords.OrderByDescending(r => r.CreatedAt))
                                     {
-                                        <div class="list-group-item @(editingRecordId == record.RecordID ? "border-primary" : "")">
+                                        <div class="list-group-item @(editingRecordId == record.RecordID ? "border-primary" : "") @(selectedRecordId == record.RecordID ? "border-success border-2" : "") clickable-record" 
+                                             @onclick="() => ViewRecordDetails(record.RecordID)"
+                                             style="cursor: pointer;">
                                             <div class="d-flex justify-content-between align-items-start">
                                                 <div class="flex-grow-1">
                                                     @if (editingRecordId == record.RecordID)
                                                     {
                                                         <!-- Edit Mode -->
-                                                        <div class="mb-2">
+                                                        <div class="mb-2" @onclick:stopPropagation="true">
                                                             <input class="form-control mb-2" @bind="editingTitle" placeholder="Title" />
                                                             <textarea class="form-control mb-2" @bind="editingDetails" rows="3" placeholder="Details"></textarea>
                                                         </div>
@@ -154,10 +190,19 @@
                                                         {
                                                             <p class="mb-1 text-muted small">@record.Details</p>
                                                         }
-                                                        <small class="text-muted">ID: @record.RecordID @(record.ParentFolderID.HasValue ? $"| Parent: {record.ParentFolderID}" : "")</small>
+                                                        <div class="d-flex justify-content-between align-items-center">
+                                                            <small class="text-muted">ID: @record.RecordID @(record.ParentFolderID.HasValue ? $"| Parent: {record.ParentFolderID}" : "")</small>
+                                                            <div class="text-end">
+                                                                <small class="text-muted d-block">Created: @record.CreatedAt.ToString("MMM dd, yyyy HH:mm")</small>
+                                                                @if (Math.Abs((record.UpdatedAt - record.CreatedAt).TotalSeconds) > 1)
+                                                                {
+                                                                    <small class="text-warning d-block">Updated: @record.UpdatedAt.ToString("MMM dd, yyyy HH:mm")</small>
+                                                                }
+                                                            </div>
+                                                        </div>
                                                     }
                                                 </div>
-                                                <div class="ms-2">
+                                                <div class="ms-2" @onclick:stopPropagation="true">
                                                     @if (editingRecordId == record.RecordID)
                                                     {
                                                         <button class="btn btn-sm btn-success me-1" @onclick="SaveEdit">💾 Save</button>
@@ -280,12 +325,15 @@
     private string patientSearchQuery = "";
     private int selectedPatientId = 0;
     private User? currentPatient = null;
+    private bool showPatientList = false;
+    private bool showAllPatientsMode = false;
 
     // Records data
     private List<RecordModel> allRecords = new List<RecordModel>();
     private List<RecordModel> filteredRecords = new List<RecordModel>();
     private string recordSearchQuery = "";
-    private char? selectedLetter = null;
+    private DateTime? selectedDate = null;
+    private int selectedRecordId = 0;
 
     // View mode
     private string viewMode = "list"; // "list" or "tree"
@@ -340,7 +388,27 @@
     private void ClearPatientSearch()
     {
         patientSearchQuery = "";
+        showPatientList = false;
+        showAllPatientsMode = false;
         FilterPatients();
+    }
+
+    private void ShowAllPatients()
+    {
+        patientSearchQuery = "";
+        filteredPatients = allPatients.OrderBy(p => p.Name).ToList();
+        showPatientList = true;
+        showAllPatientsMode = true;
+    }
+
+    private async Task SelectPatient(User patient)
+    {
+        selectedPatientId = patient.UserID;
+        currentPatient = patient;
+        patientSearchQuery = patient.Name;
+        showPatientList = false;
+        showAllPatientsMode = false;
+        await LoadRecords();
     }
 
     private async Task OnPatientSelected()
@@ -379,7 +447,7 @@
     {
         if (string.IsNullOrWhiteSpace(recordSearchQuery))
         {
-            filteredRecords = allRecords.OrderBy(r => r.Title).ToList();
+            filteredRecords = allRecords.OrderByDescending(r => r.CreatedAt).ToList();
         }
         else
         {
@@ -387,35 +455,51 @@
             filteredRecords = allRecords
                 .Where(r => r.Title.ToLower().Contains(query) || 
                            (r.Details != null && r.Details.ToLower().Contains(query)))
-                .OrderBy(r => r.Title)
+                .OrderByDescending(r => r.CreatedAt)
                 .ToList();
         }
 
-        // Apply letter filter if one is selected
-        if (selectedLetter.HasValue)
+        // Apply date filter if one is selected
+        if (selectedDate.HasValue)
         {
             filteredRecords = filteredRecords
-                .Where(r => r.Title.ToUpper().StartsWith(selectedLetter.Value))
+                .Where(r => r.CreatedAt.Date == selectedDate.Value.Date)
                 .ToList();
         }
     }
 
-    private void FilterByLetter(char letter)
+    private void FilterByDate(DateTime date)
     {
-        selectedLetter = letter;
+        selectedDate = date;
         FilterRecords();
     }
 
     private void ShowAllRecords()
     {
-        selectedLetter = null;
+        selectedDate = null;
         recordSearchQuery = "";
+        selectedRecordId = 0;
         FilterRecords();
     }
 
-    private int GetRecordCountByLetter(char letter)
+    private List<DateTime> GetUniqueDates()
     {
-        return allRecords.Count(r => r.Title.Length > 0 && char.ToUpper(r.Title[0]) == letter);
+        return allRecords
+            .Select(r => r.CreatedAt.Date)
+            .Distinct()
+            .OrderByDescending(d => d)
+            .ToList();
+    }
+
+    private int GetRecordCountByDate(DateTime date)
+    {
+        return allRecords.Count(r => r.CreatedAt.Date == date.Date);
+    }
+
+    private void ViewRecordDetails(int recordId)
+    {
+        selectedRecordId = recordId;
+        // Future enhancement: Show record history or details panel
     }
 
     private void LoadTreeView()
@@ -482,7 +566,7 @@
         return root;
     }
 
-    private void AddNewRecord()
+    private async Task AddNewRecord()
     {
         if (string.IsNullOrWhiteSpace(newRecordTitle))
         {
@@ -521,7 +605,7 @@
             newRecordType = "File";
             
             // Reload records
-            _ = LoadRecords();
+            await LoadRecords();
         }
         catch (Exception ex)
         {
@@ -537,7 +621,7 @@
         editingDetails = record.Details ?? "";
     }
 
-    private void SaveEdit()
+    private async Task SaveEdit()
     {
         if (string.IsNullOrWhiteSpace(editingTitle))
         {
@@ -561,7 +645,7 @@
                 editingRecordId = 0;
                 
                 // Reload to reflect changes
-                _ = LoadRecords();
+                await LoadRecords();
             }
         }
         catch (Exception ex)
@@ -578,7 +662,7 @@
         editingDetails = "";
     }
 
-    private void DeleteRecord(int recordId)
+    private async Task DeleteRecord(int recordId)
     {
         if (!confirm($"Are you sure you want to delete this record?"))
             return;
@@ -590,7 +674,7 @@
             isError = false;
             
             // Reload records
-            _ = LoadRecords();
+            await LoadRecords();
         }
         catch (Exception ex)
         {

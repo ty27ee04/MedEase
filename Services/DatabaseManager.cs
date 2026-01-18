@@ -307,7 +307,29 @@ public void AddAppointment(AppointmentModel appt)
             using (var conn = new MySqlConnection(connectionString))
             {
                 conn.Open();
-                string sql = "SELECT * FROM PatientRecord WHERE patientID = @pid ORDER BY recordID";
+                
+                // Check if timestamp columns exist
+                bool hasTimestamps = false;
+                try
+                {
+                    string checkSql = "SELECT created_at, updated_at FROM PatientRecord LIMIT 1";
+                    using (var checkCmd = new MySqlCommand(checkSql, conn))
+                    {
+                        using (var checkReader = checkCmd.ExecuteReader())
+                        {
+                            hasTimestamps = true;
+                        }
+                    }
+                }
+                catch (MySqlException)
+                {
+                    hasTimestamps = false;
+                }
+                
+                string sql = hasTimestamps 
+                    ? "SELECT * FROM PatientRecord WHERE patientID = @pid ORDER BY created_at DESC"
+                    : "SELECT * FROM PatientRecord WHERE patientID = @pid ORDER BY recordID DESC";
+                    
                 using (var cmd = new MySqlCommand(sql, conn))
                 {
                     cmd.Parameters.AddWithValue("@pid", patientId);
@@ -315,7 +337,7 @@ public void AddAppointment(AppointmentModel appt)
                     {
                         while (reader.Read())
                         {
-                            list.Add(new RecordModel
+                            var record = new RecordModel
                             {
                                 RecordID = Convert.ToInt32(reader["recordID"]),
                                 PatientID = Convert.ToInt32(reader["patientID"]),
@@ -323,7 +345,21 @@ public void AddAppointment(AppointmentModel appt)
                                 RecordType = reader["recordType"].ToString() ?? "",
                                 Title = reader["title"].ToString() ?? "",
                                 Details = reader["details"].ToString() ?? ""
-                            });
+                            };
+                            
+                            // Set timestamps if columns exist
+                            if (hasTimestamps)
+                            {
+                                record.CreatedAt = reader["created_at"] != DBNull.Value ? Convert.ToDateTime(reader["created_at"]) : DateTime.Now;
+                                record.UpdatedAt = reader["updated_at"] != DBNull.Value ? Convert.ToDateTime(reader["updated_at"]) : DateTime.Now;
+                            }
+                            else
+                            {
+                                record.CreatedAt = DateTime.Now;
+                                record.UpdatedAt = DateTime.Now;
+                            }
+                            
+                            list.Add(record);
                         }
                     }
                 }
@@ -337,9 +373,30 @@ public void AddAppointment(AppointmentModel appt)
             using (var conn = new MySqlConnection(connectionString))
             {
                 conn.Open();
-                string sql = @"INSERT INTO PatientRecord 
-                               (patientID, parentFolderID, recordType, title, details) 
-                               VALUES (@pid, @parentId, @type, @title, @details)";
+                
+                // Check if timestamp columns exist
+                bool hasTimestamps = false;
+                try
+                {
+                    string checkSql = "SELECT created_at FROM PatientRecord LIMIT 1";
+                    using (var checkCmd = new MySqlCommand(checkSql, conn))
+                    {
+                        checkCmd.ExecuteScalar();
+                        hasTimestamps = true;
+                    }
+                }
+                catch (MySqlException)
+                {
+                    hasTimestamps = false;
+                }
+                
+                string sql = hasTimestamps
+                    ? @"INSERT INTO PatientRecord 
+                       (patientID, parentFolderID, recordType, title, details, created_at, updated_at) 
+                       VALUES (@pid, @parentId, @type, @title, @details, NOW(), NOW())"
+                    : @"INSERT INTO PatientRecord 
+                       (patientID, parentFolderID, recordType, title, details) 
+                       VALUES (@pid, @parentId, @type, @title, @details)";
                 
                 using (var cmd = new MySqlCommand(sql, conn))
                 {
@@ -358,9 +415,30 @@ public void AddAppointment(AppointmentModel appt)
             using (var conn = new MySqlConnection(connectionString))
             {
                 conn.Open();
-                string sql = @"UPDATE PatientRecord 
-                               SET title = @title, details = @details 
-                               WHERE recordID = @rid";
+                
+                // Check if timestamp columns exist
+                bool hasTimestamps = false;
+                try
+                {
+                    string checkSql = "SELECT updated_at FROM PatientRecord LIMIT 1";
+                    using (var checkCmd = new MySqlCommand(checkSql, conn))
+                    {
+                        checkCmd.ExecuteScalar();
+                        hasTimestamps = true;
+                    }
+                }
+                catch (MySqlException)
+                {
+                    hasTimestamps = false;
+                }
+                
+                string sql = hasTimestamps
+                    ? @"UPDATE PatientRecord 
+                       SET title = @title, details = @details, updated_at = NOW() 
+                       WHERE recordID = @rid"
+                    : @"UPDATE PatientRecord 
+                       SET title = @title, details = @details 
+                       WHERE recordID = @rid";
                 
                 using (var cmd = new MySqlCommand(sql, conn))
                 {
