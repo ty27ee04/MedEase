@@ -1,6 +1,8 @@
 @page "/patient-records"
 @rendermode InteractiveServer
 @using HealthTech.Services
+@using Microsoft.AspNetCore.Components
+
 
 <PageTitle>Patient Records</PageTitle>
 
@@ -58,6 +60,9 @@
 }
 
 @code {
+    [Parameter, SupplyParameterFromQuery(Name = "patientId")]
+    public string? PatientIdQuery { get; set; }
+
     private int selectedPatientId = 2; // Default patient for demo
     private string selectedPatientName = "John Doe";
     private string recordsHtml = "<em>Click 'Load Full History' to view records...</em>";
@@ -68,6 +73,47 @@
     private string newRecordDetails = "";
     private string newRecordType = "File";
     private int? newRecordParentId = null;
+
+    protected override void OnParametersSet()
+    {
+        if (string.IsNullOrWhiteSpace(PatientIdQuery))
+            return;
+
+        // 你 Doctor Dashboard 现在传的是 "P-90210" 这种
+        // 这里先做一个简单 mapping：把 "P-90210" → 2 (demo 用)
+        // 之后你们有真实 DB/Patient table 再换成真正查询
+        if (PatientIdQuery.StartsWith("P-"))
+        {
+            selectedPatientId = PatientIdQuery switch
+            {
+                "P-90210" => 2,
+                "P-10021" => 3,
+                "P-77102" => 4,
+                "P-55219" => 5,
+                _ => 2
+            };
+        }
+        else if (int.TryParse(PatientIdQuery, out var pid))
+        {
+            // 如果以后你 dashboard 直接传数字 id，这里也支持
+            selectedPatientId = pid;
+        }
+
+        // demo 名字也先简单 mapping（你们以后可从 DB 读）
+        selectedPatientName = selectedPatientId switch
+        {
+            2 => "John Doe",
+            3 => "Alice Tan",
+            4 => "Kumar Raj",
+            5 => "Nur Aina",
+            _ => "Unknown Patient"
+        };
+
+        // 可选：一进来就自动加载 DB 记录（不用用户再按按钮）
+        // 如果你想保留“让用户点按钮才 load”，就把这行注释掉
+        // LoadFullHistory();
+    }
+
 
     private void LoadFullHistory()
     {
