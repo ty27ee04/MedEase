@@ -1,0 +1,105 @@
+@page "/api-check"
+@using HealthTech.Services
+@inject ApiService ApiService
+@inject NavigationManager Navigation
+@rendermode InteractiveServer
+
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow-lg">
+                <div class="card-body text-center p-5">
+                    @if (isChecking)
+                    {
+                        <div class="spinner-border text-primary mb-3" role="status" style="width: 4rem; height: 4rem;">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <h4>Checking API Connection...</h4>
+                        <p class="text-muted">Please wait while we connect to the backend server.</p>
+                    }
+                    else if (!isApiAvailable)
+                    {
+                        <div class="alert alert-danger mb-4" role="alert">
+                            <h2 class="alert-heading">⚠️ API Not Running!</h2>
+                            <hr>
+                            <p class="mb-3"><strong>Error:</strong> @errorMessage</p>
+                            
+                            <h5 class="mt-4">🔧 How to Fix:</h5>
+                            <ol class="text-start">
+                                <li>Open a new terminal/PowerShell</li>
+                                <li>Navigate to: <code>D:\School\Degree\Y2S3\CSE6234 Software Design\Assignment\Project\HealthTech.API</code></li>
+                                <li>Run command: <code>dotnet watch</code></li>
+                                <li>Wait until you see: <code>Now listening on: http://localhost:5030</code></li>
+                                <li>Click the "Retry Connection" button below</li>
+                            </ol>
+                        </div>
+                        
+                        <button class="btn btn-primary btn-lg" @onclick="CheckApiHealth">
+                            <i class="bi bi-arrow-clockwise"></i> Retry Connection
+                        </button>
+                    }
+                    else
+                    {
+                        <div class="text-success mb-3">
+                            <i class="bi bi-check-circle" style="font-size: 4rem;"></i>
+                        </div>
+                        <h4>✅ Connected Successfully!</h4>
+                        <p class="text-muted">Redirecting to application...</p>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private bool isChecking = true;
+    private bool isApiAvailable = false;
+    private string errorMessage = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CheckApiHealth();
+    }
+
+    private async Task CheckApiHealth()
+    {
+        isChecking = true;
+        StateHasChanged();
+
+        await Task.Delay(500); // Small delay for UX
+
+        isApiAvailable = await ApiService.IsApiAvailableAsync();
+        
+        if (!isApiAvailable)
+        {
+            errorMessage = ApiService.LastError ?? "Cannot connect to HealthTech.API";
+            isChecking = false;
+        }
+        else
+        {
+            isChecking = false;
+            StateHasChanged();
+            await Task.Delay(1000); // Show success message briefly
+            Navigation.NavigateTo("/", forceLoad: true);
+        }
+    }
+}
+
+<style>
+    code {
+        background-color: #f8f9fa;
+        padding: 2px 6px;
+        border-radius: 3px;
+        color: #d63384;
+    }
+    
+    ol {
+        margin: 1rem auto;
+        max-width: 500px;
+    }
+    
+    ol li {
+        margin-bottom: 0.5rem;
+    }
+</style>

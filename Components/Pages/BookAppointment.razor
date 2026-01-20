@@ -2,6 +2,7 @@
 @rendermode InteractiveServer
 @inject UserSession Session
 @inject NotificationService NotificationService
+@inject ApiService ApiService
 @using HealthTech.Services
 
 <PageTitle>Book Appointment</PageTitle>
@@ -147,12 +148,11 @@
     private bool isError = false;
     private bool isLoadingSlots = false;
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
-        var db = DatabaseManager.GetInstance();
-        patients = db.GetUsersByRole("Patient");
-        doctors = db.GetUsersByRole("Doctor");
-        rooms = db.GetRooms();
+        patients = await ApiService.GetUsersByRoleAsync("Patient");
+        doctors = await ApiService.GetUsersByRoleAsync("Doctor");
+        rooms = await ApiService.GetAllRoomsAsync();
 
         // Set defaults
         if (patients.Count > 0) selectedPatientId = patients[0].UserID;
@@ -160,7 +160,7 @@
         if (rooms.Count > 0) selectedRoomId = rooms[0].RoomID;
         
         // Load initial time slots for selected doctor and date
-        LoadTimeSlots();
+        await LoadTimeSlots();
     }
 
     private async Task OnDoctorChanged()
@@ -186,8 +186,7 @@
 
         try
         {
-            var db = DatabaseManager.GetInstance();
-            availableSlots = db.GetAvailableTimeSlots(selectedDoctorId, selectedDate, slotDurationMinutes: 30);
+            availableSlots = await ApiService.GetAvailableTimeSlotsAsync(selectedDoctorId, selectedDate, 30);
         }
         catch (Exception ex)
         {
@@ -236,8 +235,6 @@
                 throw new Exception("Please select a date and time");
             }
 
-            var db = DatabaseManager.GetInstance();
-
             // Get patient and doctor details
             var patient = patients.FirstOrDefault(p => p.UserID == selectedPatientId);
             var doctor = doctors.FirstOrDefault(d => d.UserID == selectedDoctorId);
@@ -248,13 +245,13 @@
             }
 
             // Validate contact information
-            if (string.IsNullOrEmpty(patient.Email) || string.IsNullOrEmpty(patient.PhoneNumber))
+            if (string.IsNullOrEmpty(patient.Email) || string.IsNullOrEmpty(patient.Phone))
             {
                 throw new Exception("Patient must have email and phone number for notifications");
             }
 
             // Double-check the time slot is still available
-            var slots = db.GetAvailableTimeSlots(selectedDoctorId, selectedDateTime.Value.Date, 30);
+            var slots = await ApiService.GetAvailableTimeSlotsAsync(selectedDoctorId, selectedDateTime.Value.Date, 30);
             var selectedSlot = slots.FirstOrDefault(s => s.DateTime == selectedDateTime.Value);
             
             if (selectedSlot == null || !selectedSlot.IsAvailable)
@@ -282,13 +279,13 @@
             };
 
             // Save to database
-            db.AddAppointment(newAppt);
+            await ApiService.SaveAppointmentAsync(newAppt);
 
             // Send notifications
             await NotificationService.SendAppointmentConfirmationAsync(
                 patientName: patient.Name,
                 patientEmail: patient.Email,
-                patientPhone: patient.PhoneNumber,
+                patientPhone: patient.Phone,
                 doctorName: doctor.Name,
                 appointmentDate: newAppt.DateTime,
                 appointmentType: selectedType
