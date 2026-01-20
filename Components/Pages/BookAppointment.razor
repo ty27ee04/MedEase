@@ -2,6 +2,7 @@
 @rendermode InteractiveServer
 @inject UserSession Session
 @inject NotificationService NotificationService
+@inject ApiService ApiService
 @using HealthTech.Services
 
 <PageTitle>Book Appointment</PageTitle>
@@ -149,10 +150,9 @@
 
     protected override async Task OnInitializedAsync()
     {
-        var db = DatabaseManager.GetInstance();
-        patients = db.GetUsersByRole("Patient");
-        doctors = db.GetUsersByRole("Doctor");
-        rooms = db.GetRooms();
+        patients = await ApiService.GetUsersByRoleAsync("Patient");
+        doctors = await ApiService.GetUsersByRoleAsync("Doctor");
+        rooms = await ApiService.GetAllRoomsAsync();
 
         // Set defaults
         if (patients.Count > 0) selectedPatientId = patients[0].UserID;
@@ -186,8 +186,7 @@
 
         try
         {
-            var db = DatabaseManager.GetInstance();
-            availableSlots = db.GetAvailableTimeSlots(selectedDoctorId, selectedDate, slotDurationMinutes: 30);
+            availableSlots = await ApiService.GetAvailableTimeSlotsAsync(selectedDoctorId, selectedDate, 30);
         }
         catch (Exception ex)
         {
@@ -236,8 +235,6 @@
                 throw new Exception("Please select a date and time");
             }
 
-            var db = DatabaseManager.GetInstance();
-
             // Get patient and doctor details
             var patient = patients.FirstOrDefault(p => p.UserID == selectedPatientId);
             var doctor = doctors.FirstOrDefault(d => d.UserID == selectedDoctorId);
@@ -254,7 +251,7 @@
             }
 
             // Double-check the time slot is still available
-            var slots = db.GetAvailableTimeSlots(selectedDoctorId, selectedDateTime.Value.Date, 30);
+            var slots = await ApiService.GetAvailableTimeSlotsAsync(selectedDoctorId, selectedDateTime.Value.Date, 30);
             var selectedSlot = slots.FirstOrDefault(s => s.DateTime == selectedDateTime.Value);
             
             if (selectedSlot == null || !selectedSlot.IsAvailable)
@@ -282,7 +279,7 @@
             };
 
             // Save to database
-            db.AddAppointment(newAppt);
+            await ApiService.SaveAppointmentAsync(newAppt);
 
             // Send notifications
             await NotificationService.SendAppointmentConfirmationAsync(

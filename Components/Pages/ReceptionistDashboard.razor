@@ -4,6 +4,7 @@
 @using System.ComponentModel.DataAnnotations
 @inject NavigationManager NavigationManager
 @inject UserSession UserSession
+@inject ApiService ApiService
 
 <PageTitle>Receptionist Dashboard</PageTitle>
 
@@ -147,17 +148,15 @@
 
     private List<AppointmentModel> appointments = new();
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
-        var db = DatabaseManager.GetInstance();
-        appointments = db.GetAllAppointments();
+        appointments = await ApiService.GetAllAppointmentsAsync();
     }
 
-    private void DeleteAppointment(int id)
+    private async Task DeleteAppointment(int id)
     {
-        var db = DatabaseManager.GetInstance();
-        db.DeleteAppointment(id);
-        appointments = db.GetAllAppointments();
+        await ApiService.DeleteAppointmentAsync(id);
+        appointments = await ApiService.GetAllAppointmentsAsync();
     }
 
     // ================= REGISTER =================
@@ -169,21 +168,16 @@
     {
         Console.WriteLine("REGISTER CLICKED"); // debug proof
 
-        await Task.Run(() =>
-        {
-            var db = DatabaseManager.GetInstance();
+        int id = await ApiService.RegisterPatientAsync(
+            newPatient.Name,
+            newPatient.Email,
+            "DefaultPassword123",  // Default password - patient can change later
+            newPatient.Phone,
+            newPatient.Age,
+            newPatient.Gender
+        );
 
-            int id = db.RegisterPatient(
-                newPatient.Name,
-                newPatient.Email,
-                "DefaultPassword123",  // Default password - patient can change later
-                newPatient.Phone,
-                newPatient.Age,
-                newPatient.Gender
-            );
-
-            registerMessage = $"✅ Patient registered successfully. ID: {id}";
-        });
+        registerMessage = $"✅ Patient registered successfully. ID: {id}";
         
         newPatient = new PatientRegistration();
     }

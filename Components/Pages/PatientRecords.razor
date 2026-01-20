@@ -1,6 +1,9 @@
 @page "/patient-records"
 @rendermode InteractiveServer
 @using HealthTech.Services
+@using Microsoft.AspNetCore.Components
+@inject ApiService ApiService
+
 
 <PageTitle>Patient Records</PageTitle>
 
@@ -361,11 +364,8 @@
 
     private async Task LoadPatients()
     {
-        await Task.Run(() =>
-        {
-            allPatients = DatabaseManager.GetInstance().GetUsersByRole("Patient");
-            filteredPatients = allPatients.OrderBy(p => p.Name).ToList();
-        });
+        allPatients = await ApiService.GetUsersByRoleAsync("Patient");
+        filteredPatients = allPatients.OrderBy(p => p.Name).ToList();
     }
 
     private void FilterPatients()
@@ -430,11 +430,8 @@
     {
         if (selectedPatientId == 0) return;
 
-        await Task.Run(() =>
-        {
-            allRecords = DatabaseManager.GetInstance().GetPatientRecords(selectedPatientId);
-            filteredRecords = allRecords.OrderBy(r => r.Title).ToList();
-        });
+        allRecords = await ApiService.GetRecordsByPatientAsync(selectedPatientId);
+        filteredRecords = allRecords.OrderBy(r => r.Title).ToList();
 
         // Load tree view
         if (viewMode == "tree")
@@ -593,7 +590,7 @@
                 Details = newRecordDetails
             };
 
-            DatabaseManager.GetInstance().AddPatientRecord(newRecord);
+            await ApiService.SaveRecordAsync(newRecord);
             
             statusMessage = $"✅ Added new {newRecordType}: '{newRecordTitle}'";
             isError = false;
@@ -638,7 +635,7 @@
                 record.Title = editingTitle;
                 record.Details = editingDetails;
                 
-                DatabaseManager.GetInstance().UpdatePatientRecord(record);
+                await ApiService.UpdateRecordAsync(record);
                 
                 statusMessage = $"✅ Record updated successfully.";
                 isError = false;
@@ -669,7 +666,7 @@
 
         try
         {
-            DatabaseManager.GetInstance().DeletePatientRecord(recordId);
+            await ApiService.DeleteRecordAsync(recordId);
             statusMessage = "✅ Record deleted successfully.";
             isError = false;
             

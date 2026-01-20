@@ -1,28 +1,28 @@
 -- ====================================================================
 -- Database Migration Script for Patient Records Timestamps
--- HealthTech Medical - Add created_at and updated_at to PatientRecord
+-- HealthTech Medical - Add createdDate and lastUpdated to PatientRecord
 -- Date: January 18, 2026
 -- ====================================================================
 
 -- Step 1: Add timestamp columns to PatientRecord table
 -- ====================================================================
 ALTER TABLE PatientRecord 
-ADD COLUMN IF NOT EXISTS created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-ADD COLUMN IF NOT EXISTS updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP;
+ADD COLUMN IF NOT EXISTS createdDate DATETIME DEFAULT CURRENT_TIMESTAMP,
+ADD COLUMN IF NOT EXISTS lastUpdated DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP;
 
 -- Step 2: Update existing records with current timestamp
 -- ====================================================================
 UPDATE PatientRecord 
-SET created_at = NOW(), 
-    updated_at = NOW()
-WHERE created_at IS NULL OR updated_at IS NULL;
+SET createdDate = NOW(), 
+    lastUpdated = NOW()
+WHERE createdDate IS NULL OR lastUpdated IS NULL;
 
 -- ====================================================================
 -- Step 3: Verify the changes
 -- ====================================================================
-SELECT recordID, patientID, title, recordType, created_at, updated_at 
+SELECT recordID, patientID, title, recordType, createdDate, lastUpdated 
 FROM PatientRecord 
-ORDER BY created_at DESC
+ORDER BY createdDate DESC
 LIMIT 10;
 
 -- ====================================================================
