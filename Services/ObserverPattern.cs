@@ -103,7 +103,7 @@ namespace HealthTech.Services
 
         public async Task UpdateAsync(string message, User patient, AppointmentModel appointment)
         {
-            if (string.IsNullOrEmpty(patient.PhoneNumber))
+            if (string.IsNullOrEmpty(patient.Phone))
             {
                 Console.WriteLine($"[WhatsApp Service] No phone number for patient: {patient.Name}");
                 return;
@@ -116,7 +116,7 @@ namespace HealthTech.Services
                                    $"Date: {appointment.DateTime:dd MMM yyyy, hh:mm tt}\n" +
                                    $"Type: {appointment.Type}";
 
-            await _notificationService.SendWhatsAppAsync(patient.PhoneNumber, whatsappMessage);
+            await _notificationService.SendWhatsAppAsync(patient.Phone, whatsappMessage);
         }
     }
 
@@ -138,7 +138,7 @@ namespace HealthTech.Services
 
         public async Task UpdateAsync(string message, User patient, AppointmentModel appointment)
         {
-            if (string.IsNullOrEmpty(patient.PhoneNumber))
+            if (string.IsNullOrEmpty(patient.Phone))
             {
                 Console.WriteLine($"[SMS Service] No phone number for patient: {patient.Name}");
                 return;
@@ -148,7 +148,7 @@ namespace HealthTech.Services
                               $"Dr. {appointment.DoctorName}, " +
                               $"{appointment.DateTime:dd MMM, hh:mm tt}";
 
-            await _notificationService.SendSmsAsync(patient.PhoneNumber, smsMessage);
+            await _notificationService.SendSmsAsync(patient.Phone, smsMessage);
         }
     }
 }

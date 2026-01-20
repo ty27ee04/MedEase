@@ -102,7 +102,7 @@ namespace HealthTech.Services
                 }
 
                 // Validate contact information
-                if (string.IsNullOrEmpty(patient.Email) || string.IsNullOrEmpty(patient.PhoneNumber))
+                if (string.IsNullOrEmpty(patient.Email) || string.IsNullOrEmpty(patient.Phone))
                 {
                     _logger.LogWarning(
                         "[Reminder Service] Missing contact info for Patient ID {id}",
@@ -114,7 +114,7 @@ namespace HealthTech.Services
                 await notificationService.SendAppointmentReminderAsync(
                     patientName: patient.Name,
                     patientEmail: patient.Email,
-                    patientPhone: patient.PhoneNumber,
+                    patientPhone: patient.Phone,
                     doctorName: appointment.DoctorName,
                     appointmentDate: appointment.DateTime,
                     appointmentType: appointment.Type,
