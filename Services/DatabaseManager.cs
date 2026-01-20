@@ -312,7 +312,7 @@ public void AddAppointment(AppointmentModel appt)
                 bool hasTimestamps = false;
                 try
                 {
-                    string checkSql = "SELECT created_at, updated_at FROM PatientRecord LIMIT 1";
+                    string checkSql = "SELECT createdDate, lastUpdated FROM PatientRecord LIMIT 1";
                     using (var checkCmd = new MySqlCommand(checkSql, conn))
                     {
                         using (var checkReader = checkCmd.ExecuteReader())
@@ -327,7 +327,7 @@ public void AddAppointment(AppointmentModel appt)
                 }
                 
                 string sql = hasTimestamps 
-                    ? "SELECT * FROM PatientRecord WHERE patientID = @pid ORDER BY created_at DESC"
+                    ? "SELECT * FROM PatientRecord WHERE patientID = @pid ORDER BY createdDate DESC"
                     : "SELECT * FROM PatientRecord WHERE patientID = @pid ORDER BY recordID DESC";
                     
                 using (var cmd = new MySqlCommand(sql, conn))
@@ -350,8 +350,8 @@ public void AddAppointment(AppointmentModel appt)
                             // Set timestamps if columns exist
                             if (hasTimestamps)
                             {
-                                record.CreatedAt = reader["created_at"] != DBNull.Value ? Convert.ToDateTime(reader["created_at"]) : DateTime.Now;
-                                record.UpdatedAt = reader["updated_at"] != DBNull.Value ? Convert.ToDateTime(reader["updated_at"]) : DateTime.Now;
+                                record.CreatedAt = reader["createdDate"] != DBNull.Value ? Convert.ToDateTime(reader["createdDate"]) : DateTime.Now;
+                                record.UpdatedAt = reader["lastUpdated"] != DBNull.Value ? Convert.ToDateTime(reader["lastUpdated"]) : DateTime.Now;
                             }
                             else
                             {
@@ -378,7 +378,7 @@ public void AddAppointment(AppointmentModel appt)
                 bool hasTimestamps = false;
                 try
                 {
-                    string checkSql = "SELECT created_at FROM PatientRecord LIMIT 1";
+                    string checkSql = "SELECT createdDate FROM PatientRecord LIMIT 1";
                     using (var checkCmd = new MySqlCommand(checkSql, conn))
                     {
                         checkCmd.ExecuteScalar();
@@ -392,7 +392,7 @@ public void AddAppointment(AppointmentModel appt)
                 
                 string sql = hasTimestamps
                     ? @"INSERT INTO PatientRecord 
-                       (patientID, parentFolderID, recordType, title, details, created_at, updated_at) 
+                       (patientID, parentFolderID, recordType, title, details, createdDate, lastUpdated) 
                        VALUES (@pid, @parentId, @type, @title, @details, NOW(), NOW())"
                     : @"INSERT INTO PatientRecord 
                        (patientID, parentFolderID, recordType, title, details) 
@@ -420,7 +420,7 @@ public void AddAppointment(AppointmentModel appt)
                 bool hasTimestamps = false;
                 try
                 {
-                    string checkSql = "SELECT updated_at FROM PatientRecord LIMIT 1";
+                    string checkSql = "SELECT lastUpdated FROM PatientRecord LIMIT 1";
                     using (var checkCmd = new MySqlCommand(checkSql, conn))
                     {
                         checkCmd.ExecuteScalar();
@@ -434,7 +434,7 @@ public void AddAppointment(AppointmentModel appt)
                 
                 string sql = hasTimestamps
                     ? @"UPDATE PatientRecord 
-                       SET title = @title, details = @details, updated_at = NOW() 
+                       SET title = @title, details = @details, lastUpdated = NOW() 
                        WHERE recordID = @rid"
                     : @"UPDATE PatientRecord 
                        SET title = @title, details = @details 

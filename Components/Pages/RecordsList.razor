@@ -1,6 +1,7 @@
 @page "/records-list"
 @rendermode InteractiveServer
 @using HealthTech.Services
+@inject ApiService ApiService
 
 <PageTitle>Medical Records List</PageTitle>
 
@@ -244,33 +245,27 @@
 
     private async Task LoadPatients()
     {
-        await Task.Run(() =>
-        {
-            patients = DatabaseManager.GetInstance().GetUsersByRole("Patient");
-        });
+        patients = await ApiService.GetUsersByRoleAsync("Patient");
     }
 
     private async Task LoadRecords()
     {
         isLoading = true;
         
-        await Task.Run(() =>
+        if (selectedPatientId > 0)
         {
-            if (selectedPatientId > 0)
+            allRecords = await ApiService.GetRecordsByPatientAsync(selectedPatientId);
+        }
+        else
+        {
+            // Load all records for all patients
+            allRecords = new List<RecordModel>();
+            foreach (var patient in patients)
             {
-                allRecords = DatabaseManager.GetInstance().GetPatientRecords(selectedPatientId);
+                var records = await ApiService.GetRecordsByPatientAsync(patient.UserID);
+                allRecords.AddRange(records);
             }
-            else
-            {
-                // Load all records for all patients
-                allRecords = new List<RecordModel>();
-                foreach (var patient in patients)
-                {
-                    var records = DatabaseManager.GetInstance().GetPatientRecords(patient.UserID);
-                    allRecords.AddRange(records);
-                }
-            }
-        });
+        }
 
         filteredRecords = allRecords.OrderBy(r => r.Title).ToList();
         isLoading = false;
