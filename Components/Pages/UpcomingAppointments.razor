@@ -1,6 +1,7 @@
 @page "/upcoming-appointments"
 @rendermode InteractiveServer
 @inject NotificationService NotificationService
+@inject ApiService ApiService
 @using HealthTech.Services
 
 <PageTitle>Appointments Management</PageTitle>
@@ -314,15 +315,15 @@
     private string sortBy = "DateTime";
     private string sortOrder = "ASC";
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
-        LoadData();
+        await LoadData();
         ApplyFilters();
     }
 
-    private void LoadData()
+    private async Task LoadData()
     {
-        allAppointments = DatabaseManager.GetInstance().GetAllAppointments();
+        allAppointments = await ApiService.GetAllAppointmentsAsync();
     }
 
     private void ApplyFilters()
@@ -435,12 +436,12 @@
         try
         {
             editingModel.DateTime = editingDateTime;
-            await Task.Run(() => DatabaseManager.GetInstance().UpdateAppointment(editingModel));
+            await ApiService.UpdateAppointmentAsync(editingModel);
             
             message = $"✅ Appointment #{editingModel.AppointmentID} updated successfully";
             isError = false;
             isEditing = false;
-            LoadData();
+            await LoadData();
             ApplyFilters();
         }
         catch (Exception ex)
@@ -469,8 +470,7 @@
         
         try
         {
-            var db = DatabaseManager.GetInstance();
-            var patient = db.GetUserById(appt.PatientID);
+            var patient = await ApiService.GetUserByIdAsync(appt.PatientID);
             
             if (patient == null)
             {
@@ -497,7 +497,7 @@
 
             // Update status to ReminderSent
             appt.Status = "ReminderSent";
-            db.UpdateAppointment(appt);
+            await ApiService.UpdateAppointmentAsync(appt);
 
             // Format time until appointment
             string timeText;
@@ -510,7 +510,7 @@
 
             message = $"✅ Reminder sent to {patient.Name} (Email & WhatsApp) - Appointment in {timeText}";
             isError = false;
-            LoadData();
+            await LoadData();
             ApplyFilters();
         }
         catch (Exception ex)
@@ -525,16 +525,16 @@
         }
     }
 
-    private void CheckInPatient(AppointmentModel appt)
+    private async Task CheckInPatient(AppointmentModel appt)
     {
         try
         {
             appt.Status = "CheckedIn";
-            DatabaseManager.GetInstance().UpdateAppointment(appt);
+            await ApiService.UpdateAppointmentAsync(appt);
             
             message = $"✅ Patient checked in for Appointment #{appt.AppointmentID}";
             isError = false;
-            LoadData();
+            await LoadData();
             ApplyFilters();
         }
         catch (Exception ex)
@@ -546,16 +546,16 @@
         StateHasChanged();
     }
 
-    private void CompleteAppointment(AppointmentModel appt)
+    private async Task CompleteAppointment(AppointmentModel appt)
     {
         try
         {
             appt.Status = "Completed";
-            DatabaseManager.GetInstance().UpdateAppointment(appt);
+            await ApiService.UpdateAppointmentAsync(appt);
             
             message = $"✅ Appointment #{appt.AppointmentID} marked as completed";
             isError = false;
-            LoadData();
+            await LoadData();
             ApplyFilters();
         }
         catch (Exception ex)
@@ -567,16 +567,16 @@
         StateHasChanged();
     }
 
-    private void CancelAppointment(AppointmentModel appt)
+    private async Task CancelAppointment(AppointmentModel appt)
     {
         try
         {
             appt.Status = "Cancelled";
-            DatabaseManager.GetInstance().UpdateAppointment(appt);
+            await ApiService.UpdateAppointmentAsync(appt);
             
             message = $"✅ Appointment #{appt.AppointmentID} has been cancelled";
             isError = false;
-            LoadData();
+            await LoadData();
             ApplyFilters();
         }
         catch (Exception ex)
@@ -588,16 +588,16 @@
         StateHasChanged();
     }
 
-    private void DeleteAppointment(int id)
+    private async Task DeleteAppointment(int id)
     {
         isProcessing = true;
         
         try
         {
-            DatabaseManager.GetInstance().DeleteAppointment(id);
+            await ApiService.DeleteAppointmentAsync(id);
             message = $"✅ Appointment #{id} deleted successfully";
             isError = false;
-            LoadData();
+            await LoadData();
             ApplyFilters();
         }
         catch (Exception ex)

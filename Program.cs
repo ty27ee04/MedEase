@@ -7,9 +7,16 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
+// Register HttpClient for API calls with timeout configuration
+builder.Services.AddHttpClient<ApiService>(client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(5); // Prevent long waits when API is down
+});
+
 // Register custom services
 builder.Services.AddScoped<UserSession>();
 builder.Services.AddScoped<NotificationService>();
+builder.Services.AddScoped<ApiService>();
 
 // Register background service for appointment reminders
 builder.Services.AddHostedService<AppointmentReminderService>();
