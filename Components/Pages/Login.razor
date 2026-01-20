@@ -3,6 +3,7 @@
 @using HealthTech.Services
 @inject UserSession Session
 @inject NavigationManager Nav
+@inject ApiService ApiService
 
 <PageTitle>Login</PageTitle>
 
@@ -73,31 +74,52 @@
     string regPass = "";
     string regRole = "Patient";
 
-    private void DoLogin()
-    {
-        var user = DatabaseManager.GetInstance().LoginUser(username, password);
-        if (user != null)
-        {
-            Session.Login(user);
-            Nav.NavigateTo("/"); // Go to Home Page
-        }
-        else
-        {
-            message = "Invalid Username or Password!";
-        }
-    }
-
-    private void DoRegister()
+    private async Task DoLogin()
     {
         try
         {
-            DatabaseManager.GetInstance().RegisterUser(regName, regPass, regRole);
+            var user = await ApiService.LoginByNameAsync(username, password);
+            if (user != null)
+            {
+                Session.Login(user);
+                Nav.NavigateTo("/"); // Go to Home Page
+            }
+            else
+            {
+                message = "Invalid Username or Password!";
+            }
+        }
+        catch (Exception ex)
+        {
+            if (ex.Message.Contains("API Connection") || ex.Message.Contains("API Timeout"))
+            {
+                message = "⚠️ Cannot connect to server. Please make sure HealthTech.API is running!";
+            }
+            else
+            {
+                message = "Error: " + ex.Message;
+            }
+        }
+    }
+
+    private async Task DoRegister()
+    {
+        try
+        {
+            await ApiService.RegisterUserAsync(regName, regPass, regRole);
             message = "Success! Please switch to Login.";
             isLoginMode = true; // Switch back to login tab
         }
         catch (Exception ex)
         {
-            message = "Error: " + ex.Message;
+            if (ex.Message.Contains("API Connection") || ex.Message.Contains("API Timeout"))
+            {
+                message = "⚠️ Cannot connect to server. Please make sure HealthTech.API is running!";
+            }
+            else
+            {
+                message = "Error: " + ex.Message;
+            }
         }
     }
 }

@@ -1,67 +1,350 @@
 @page "/patient-records"
 @rendermode InteractiveServer
 @using HealthTech.Services
+@using Microsoft.AspNetCore.Components
+@inject ApiService ApiService
+
 
 <PageTitle>Patient Records</PageTitle>
 
-<h1>Patient Medical History</h1>
-<p>This module uses the <strong>Composite Pattern</strong> to manage hierarchical records.</p>
+<div class="container-fluid mt-3">
+    <h1>📋 Patient Medical Records</h1>
+    <p>Search patients, view information, and manage hierarchical medical records</p>
 
-<div class="row">
-    <div class="col-md-8">
-        <div class="card">
-            <div class="card-header bg-primary text-white">
-                <strong>Patient: @selectedPatientName (ID: @selectedPatientId)</strong>
+    <!-- Patient Search Section -->
+    <div class="card mb-4">
+        <div class="card-header bg-primary text-white">
+            <strong>🔍 Patient Search</strong>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-12">
+                    <div class="input-group mb-3">
+                        <span class="input-group-text">Search</span>
+                        <input type="text" class="form-control" 
+                               placeholder="Type patient name or ID to search..." 
+                               @bind="patientSearchQuery"
+                               @bind:event="oninput"
+                               @onkeyup="FilterPatients"
+                               @onfocus="() => showPatientList = true" />
+                        @if (!string.IsNullOrEmpty(patientSearchQuery))
+                        {
+                            <button class="btn btn-outline-secondary" @onclick="ClearPatientSearch">✖</button>
+                        }
+                        <button class="btn btn-primary" @onclick="ShowAllPatients">
+                            👥 View All Patients
+                        </button>
+                    </div>
+                    
+                    @if (showPatientList && filteredPatients.Count > 0)
+                    {
+                        <div class="list-group" style="max-height: 400px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px;">
+                            @foreach (var patient in filteredPatients.Take(showAllPatientsMode ? 1000 : 10))
+                            {
+                                <button type="button" 
+                                        class="list-group-item list-group-item-action d-flex justify-content-between align-items-center @(selectedPatientId == patient.UserID ? "active" : "")"
+                                        @onclick="() => SelectPatient(patient)">
+                                    <div>
+                                        <strong>@patient.Name</strong>
+                                        <br />
+                                        <small class="@(selectedPatientId == patient.UserID ? "text-white" : "text-muted")">
+                                            ID: @patient.UserID | Email: @patient.Email | Phone: @patient.Phone
+                                        </small>
+                                    </div>
+                                    @if (selectedPatientId == patient.UserID)
+                                    {
+                                        <span class="badge bg-light text-primary">✓ Selected</span>
+                                    }
+                                </button>
+                            }
+                            @if (filteredPatients.Count > 10 && !showAllPatientsMode)
+                            {
+                                <div class="list-group-item text-center text-muted">
+                                    <small>Showing 10 of @filteredPatients.Count patients. Type more to narrow results or click "View All Patients".</small>
+                                </div>
+                            }
+                        </div>
+                    }
+                    else if (showPatientList && !string.IsNullOrEmpty(patientSearchQuery) && filteredPatients.Count == 0)
+                    {
+                        <div class="alert alert-info mb-0">
+                            No patients found matching "@patientSearchQuery"
+                        </div>
+                    }
+                    else if (string.IsNullOrEmpty(patientSearchQuery))
+                    {
+                        <div class="alert alert-info mb-0">
+                            <i class="bi bi-info-circle"></i> Start typing to search for patients...
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (selectedPatientId > 0 && currentPatient != null)
+    {
+        <!-- Patient Information Card -->
+        <div class="card mb-4">
+            <div class="card-header bg-success text-white">
+                <strong>👤 Patient Information</strong>
             </div>
             <div class="card-body">
-                @((MarkupString)recordsHtml)
+                <div class="row">
+                    <div class="col-md-2">
+                        <strong>Name:</strong> @currentPatient.Name
+                    </div>
+                    <div class="col-md-1">
+                        <strong>ID:</strong> @currentPatient.UserID
+                    </div>
+                    <div class="col-md-3">
+                        <strong>Email:</strong> @currentPatient.Email
+                    </div>
+                    <div class="col-md-2">
+                        <strong>Phone:</strong> @currentPatient.Phone
+                    </div>
+                    <div class="col-md-1">
+                        <strong>Age:</strong> @(currentPatient.Age?.ToString() ?? "N/A")
+                    </div>
+                    <div class="col-md-3">
+                        <strong>Gender:</strong> @currentPatient.Gender
+                    </div>
+                </div>
             </div>
-        </div>
-    </div>
-    
-    <div class="col-md-4">
-        <div class="card p-3 mb-3">
-            <h5>Load Records</h5>
-            <button class="btn btn-success btn-block mb-2" @onclick="LoadFullHistory">📂 Load Full History</button>
-            <button class="btn btn-info btn-block mb-2" @onclick="LoadSampleHierarchy">📋 Load Sample Data</button>
         </div>
 
-        <div class="card p-3">
-            <h5>Add New Record</h5>
-            <div class="form-group mb-2">
-                <label>Title</label>
-                <input class="form-control" @bind="newRecordTitle" placeholder="e.g., Blood Test Results" />
-            </div>
-            <div class="form-group mb-2">
-                <label>Details</label>
-                <textarea class="form-control" @bind="newRecordDetails" placeholder="Details..." rows="3"></textarea>
-            </div>
-            <div class="form-group mb-2">
-                <label>Type</label>
-                <select class="form-control" @bind="newRecordType">
-                    <option value="File">📄 File (Leaf)</option>
-                    <option value="Folder">📂 Folder (Composite)</option>
-                </select>
-            </div>
-            <div class="form-group mb-3">
-                <label>Parent Folder ID (optional)</label>
-                <input class="form-control" type="number" @bind="newRecordParentId" placeholder="Leave empty for root" />
-            </div>
-            <button class="btn btn-primary btn-block" @onclick="AddNewRecord">➕ Add Record</button>
+        <!-- View Toggle -->
+        <div class="btn-group mb-3" role="group">
+            <button type="button" class="btn @(viewMode == "list" ? "btn-primary" : "btn-outline-primary")" 
+                    @onclick='() => viewMode = "list"'>
+                📑 List View (by Date)
+            </button>
+            <button type="button" class="btn @(viewMode == "tree" ? "btn-primary" : "btn-outline-primary")" 
+                    @onclick='() => viewMode = "tree"'>
+                🌳 Tree View (Hierarchical)
+            </button>
         </div>
-    </div>
+
+        <div class="row">
+            <div class="col-md-8">
+                @if (viewMode == "list")
+                {
+                    <!-- Date-Based List View -->
+                    <div class="card mb-3">
+                        <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+                            <strong>📑 Records List (by Date)</strong>
+                            <div>
+                                <input type="text" class="form-control form-control-sm d-inline-block" 
+                                       style="width: 200px;" 
+                                       placeholder="Filter records..." 
+                                       @bind="recordSearchQuery"
+                                       @bind:event="oninput"
+                                       @onkeyup="FilterRecords" />
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <!-- Date Navigation -->
+                            <div class="mb-3 d-flex flex-wrap gap-1">
+                                @foreach (var date in GetUniqueDates())
+                                {
+                                    var count = GetRecordCountByDate(date);
+                                    <button class="btn btn-sm @(selectedDate == date ? "btn-primary" : "btn-outline-primary")" 
+                                            @onclick="() => FilterByDate(date)">
+                                        @date.ToString("MMM dd, yyyy") (@count)
+                                    </button>
+                                }
+                                <button class="btn btn-sm @(selectedDate == null ? "btn-success" : "btn-outline-success")" 
+                                        @onclick="ShowAllRecords">All</button>
+                            </div>
+
+                            <!-- Records List -->
+                            @if (filteredRecords.Count == 0)
+                            {
+                                <div class="alert alert-info">No records found</div>
+                            }
+                            else
+                            {
+                                <div class="list-group">
+                                    @foreach (var record in filteredRecords.OrderByDescending(r => r.CreatedAt))
+                                    {
+                                        <div class="list-group-item @(editingRecordId == record.RecordID ? "border-primary" : "") @(selectedRecordId == record.RecordID ? "border-success border-2" : "") clickable-record" 
+                                             @onclick="() => ViewRecordDetails(record.RecordID)"
+                                             style="cursor: pointer;">
+                                            <div class="d-flex justify-content-between align-items-start">
+                                                <div class="flex-grow-1">
+                                                    @if (editingRecordId == record.RecordID)
+                                                    {
+                                                        <!-- Edit Mode -->
+                                                        <div class="mb-2" @onclick:stopPropagation="true">
+                                                            <input class="form-control mb-2" @bind="editingTitle" placeholder="Title" />
+                                                            <textarea class="form-control mb-2" @bind="editingDetails" rows="3" placeholder="Details"></textarea>
+                                                        </div>
+                                                    }
+                                                    else
+                                                    {
+                                                        <!-- View Mode -->
+                                                        <div class="d-flex align-items-center mb-1">
+                                                            <span class="badge @(record.RecordType == "Folder" ? "bg-warning text-dark" : "bg-info") me-2">
+                                                                @(record.RecordType == "Folder" ? "📂" : "📄") @record.RecordType
+                                                            </span>
+                                                            <h6 class="mb-0">@record.Title</h6>
+                                                        </div>
+                                                        @if (!string.IsNullOrEmpty(record.Details))
+                                                        {
+                                                            <p class="mb-1 text-muted small">@record.Details</p>
+                                                        }
+                                                        <div class="d-flex justify-content-between align-items-center">
+                                                            <small class="text-muted">ID: @record.RecordID @(record.ParentFolderID.HasValue ? $"| Parent: {record.ParentFolderID}" : "")</small>
+                                                            <div class="text-end">
+                                                                <small class="text-muted d-block">Created: @record.CreatedAt.ToString("MMM dd, yyyy HH:mm")</small>
+                                                                @if (Math.Abs((record.UpdatedAt - record.CreatedAt).TotalSeconds) > 1)
+                                                                {
+                                                                    <small class="text-warning d-block">Updated: @record.UpdatedAt.ToString("MMM dd, yyyy HH:mm")</small>
+                                                                }
+                                                            </div>
+                                                        </div>
+                                                    }
+                                                </div>
+                                                <div class="ms-2" @onclick:stopPropagation="true">
+                                                    @if (editingRecordId == record.RecordID)
+                                                    {
+                                                        <button class="btn btn-sm btn-success me-1" @onclick="SaveEdit">💾 Save</button>
+                                                        <button class="btn btn-sm btn-secondary" @onclick="CancelEdit">✖ Cancel</button>
+                                                    }
+                                                    else
+                                                    {
+                                                        <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => StartEdit(record)">✏️ Edit</button>
+                                                        <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteRecord(record.RecordID)">🗑️</button>
+                                                    }
+                                                </div>
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <!-- Tree View -->
+                    <div class="card">
+                        <div class="card-header bg-info text-white">
+                            <strong>🌳 Hierarchical View (Composite Pattern)</strong>
+                        </div>
+                        <div class="card-body">
+                            @if (string.IsNullOrEmpty(recordsHtml))
+                            {
+                                <em class="text-muted">Loading tree view...</em>
+                            }
+                            else
+                            {
+                                @((MarkupString)recordsHtml)
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+
+            <div class="col-md-4">
+                <!-- Add New Record -->
+                <div class="card mb-3">
+                    <div class="card-header bg-warning">
+                        <strong>➕ Add New Record</strong>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-2">
+                            <label class="form-label">Title *</label>
+                            <input class="form-control" @bind="newRecordTitle" placeholder="e.g., Blood Test Results" />
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">Details</label>
+                            <textarea class="form-control" @bind="newRecordDetails" placeholder="Details..." rows="3"></textarea>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">Type</label>
+                            <select class="form-control" @bind="newRecordType">
+                                <option value="File">📄 File (Leaf)</option>
+                                <option value="Folder">📂 Folder (Composite)</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Parent Folder ID (optional)</label>
+                            <input class="form-control" type="number" @bind="newRecordParentId" placeholder="Leave empty for root" />
+                        </div>
+                        <button class="btn btn-primary w-100" @onclick="AddNewRecord">➕ Add Record</button>
+                    </div>
+                </div>
+
+                <!-- Statistics -->
+                <div class="card">
+                    <div class="card-header">
+                        <strong>📊 Statistics</strong>
+                    </div>
+                    <div class="card-body">
+                        <div class="row text-center">
+                            <div class="col-6 mb-3">
+                                <h4 class="text-primary">@allRecords.Count</h4>
+                                <small class="text-muted">Total Records</small>
+                            </div>
+                            <div class="col-6 mb-3">
+                                <h4 class="text-warning">@allRecords.Count(r => r.RecordType == "Folder")</h4>
+                                <small class="text-muted">Folders</small>
+                            </div>
+                            <div class="col-6">
+                                <h4 class="text-info">@allRecords.Count(r => r.RecordType == "File")</h4>
+                                <small class="text-muted">Files</small>
+                            </div>
+                            <div class="col-6">
+                                <h4 class="text-success">@filteredRecords.Count</h4>
+                                <small class="text-muted">Displayed</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle"></i> Please select a patient to view and manage their medical records.
+        </div>
+    }
 </div>
 
 @if (!string.IsNullOrEmpty(statusMessage))
 {
-    <div class="alert alert-info mt-3">@statusMessage</div>
+    <div class="alert @(isError ? "alert-danger" : "alert-success") alert-dismissible fade show mt-3" role="alert">
+        @statusMessage
+        <button type="button" class="btn-close" @onclick='() => statusMessage = ""'></button>
+    </div>
 }
 
 @code {
-    private int selectedPatientId = 2; // Default patient for demo
-    private string selectedPatientName = "John Doe";
-    private string recordsHtml = "<em>Click 'Load Full History' to view records...</em>";
+    // Patient search and selection
+    private List<User> allPatients = new List<User>();
+    private List<User> filteredPatients = new List<User>();
+    private string patientSearchQuery = "";
+    private int selectedPatientId = 0;
+    private User? currentPatient = null;
+    private bool showPatientList = false;
+    private bool showAllPatientsMode = false;
+
+    // Records data
+    private List<RecordModel> allRecords = new List<RecordModel>();
+    private List<RecordModel> filteredRecords = new List<RecordModel>();
+    private string recordSearchQuery = "";
+    private DateTime? selectedDate = null;
+    private int selectedRecordId = 0;
+
+    // View mode
+    private string viewMode = "list"; // "list" or "tree"
+    private string recordsHtml = "";
+
+    // Status
     private string statusMessage = "";
+    private bool isError = false;
 
     // Form fields for adding new records
     private string newRecordTitle = "";
@@ -69,30 +352,169 @@
     private string newRecordType = "File";
     private int? newRecordParentId = null;
 
-    private void LoadFullHistory()
+    // Editing
+    private int editingRecordId = 0;
+    private string editingTitle = "";
+    private string editingDetails = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadPatients();
+    }
+
+    private async Task LoadPatients()
+    {
+        allPatients = await ApiService.GetUsersByRoleAsync("Patient");
+        filteredPatients = allPatients.OrderBy(p => p.Name).ToList();
+    }
+
+    private void FilterPatients()
+    {
+        if (string.IsNullOrWhiteSpace(patientSearchQuery))
+        {
+            filteredPatients = allPatients.OrderBy(p => p.Name).ToList();
+        }
+        else
+        {
+            var query = patientSearchQuery.ToLower();
+            filteredPatients = allPatients
+                .Where(p => p.Name.ToLower().Contains(query) || 
+                           p.UserID.ToString().Contains(query))
+                .OrderBy(p => p.Name)
+                .ToList();
+        }
+    }
+
+    private void ClearPatientSearch()
+    {
+        patientSearchQuery = "";
+        showPatientList = false;
+        showAllPatientsMode = false;
+        FilterPatients();
+    }
+
+    private void ShowAllPatients()
+    {
+        patientSearchQuery = "";
+        filteredPatients = allPatients.OrderBy(p => p.Name).ToList();
+        showPatientList = true;
+        showAllPatientsMode = true;
+    }
+
+    private async Task SelectPatient(User patient)
+    {
+        selectedPatientId = patient.UserID;
+        currentPatient = patient;
+        patientSearchQuery = patient.Name;
+        showPatientList = false;
+        showAllPatientsMode = false;
+        await LoadRecords();
+    }
+
+    private async Task OnPatientSelected()
+    {
+        if (selectedPatientId == 0)
+        {
+            currentPatient = null;
+            allRecords.Clear();
+            filteredRecords.Clear();
+            recordsHtml = "";
+            return;
+        }
+
+        currentPatient = allPatients.FirstOrDefault(p => p.UserID == selectedPatientId);
+        await LoadRecords();
+    }
+
+    private async Task LoadRecords()
+    {
+        if (selectedPatientId == 0) return;
+
+        allRecords = await ApiService.GetRecordsByPatientAsync(selectedPatientId);
+        filteredRecords = allRecords.OrderBy(r => r.Title).ToList();
+
+        // Load tree view
+        if (viewMode == "tree")
+        {
+            LoadTreeView();
+        }
+    }
+
+    private void FilterRecords()
+    {
+        if (string.IsNullOrWhiteSpace(recordSearchQuery))
+        {
+            filteredRecords = allRecords.OrderByDescending(r => r.CreatedAt).ToList();
+        }
+        else
+        {
+            var query = recordSearchQuery.ToLower();
+            filteredRecords = allRecords
+                .Where(r => r.Title.ToLower().Contains(query) || 
+                           (r.Details != null && r.Details.ToLower().Contains(query)))
+                .OrderByDescending(r => r.CreatedAt)
+                .ToList();
+        }
+
+        // Apply date filter if one is selected
+        if (selectedDate.HasValue)
+        {
+            filteredRecords = filteredRecords
+                .Where(r => r.CreatedAt.Date == selectedDate.Value.Date)
+                .ToList();
+        }
+    }
+
+    private void FilterByDate(DateTime date)
+    {
+        selectedDate = date;
+        FilterRecords();
+    }
+
+    private void ShowAllRecords()
+    {
+        selectedDate = null;
+        recordSearchQuery = "";
+        selectedRecordId = 0;
+        FilterRecords();
+    }
+
+    private List<DateTime> GetUniqueDates()
+    {
+        return allRecords
+            .Select(r => r.CreatedAt.Date)
+            .Distinct()
+            .OrderByDescending(d => d)
+            .ToList();
+    }
+
+    private int GetRecordCountByDate(DateTime date)
+    {
+        return allRecords.Count(r => r.CreatedAt.Date == date.Date);
+    }
+
+    private void ViewRecordDetails(int recordId)
+    {
+        selectedRecordId = recordId;
+        // Future enhancement: Show record history or details panel
+    }
+
+    private void LoadTreeView()
     {
         try
         {
-            // 1. Get all records from database
-            var dbRecords = DatabaseManager.GetInstance().GetPatientRecords(selectedPatientId);
-
-            if (dbRecords.Count == 0)
+            if (allRecords.Count == 0)
             {
-                recordsHtml = "<em>No records found for this patient.</em>";
+                recordsHtml = "<em class='text-muted'>No records found for this patient.</em>";
                 return;
             }
 
-            // 2. Build the hierarchical tree using recursive Composite pattern
-            RecordFolder root = BuildRecordTree(dbRecords);
-
-            // 3. Generate HTML
+            RecordFolder root = BuildRecordTree(allRecords);
             recordsHtml = root.GetHtmlSummary(0);
-            statusMessage = $"✅ Loaded {dbRecords.Count} records from database.";
         }
         catch (Exception ex)
         {
-            recordsHtml = $"<em style='color:red;'>Error loading records: {ex.Message}</em>";
-            statusMessage = "❌ Error loading records.";
+            recordsHtml = $"<em style='color:red;'>Error loading tree: {ex.Message}</em>";
         }
     }
 
@@ -141,48 +563,19 @@
         return root;
     }
 
-    private void LoadSampleHierarchy()
-    {
-        // Demonstrate Composite Pattern with hardcoded sample data
-        RecordFolder root = new RecordFolder("📋 Sample Medical Records");
-        
-        // Create main folders (Composites)
-        RecordFolder labResults = new RecordFolder("🧪 Laboratory Results");
-        labResults.Add(new SingleRecord("Blood Test - Hemoglobin: 14.5 g/dL"));
-        labResults.Add(new SingleRecord("Urine Analysis - Normal"));
-        labResults.Add(new SingleRecord("Lipid Panel - Cholesterol: 180 mg/dL"));
-        
-        RecordFolder imaging = new RecordFolder("🩻 Imaging Reports");
-        imaging.Add(new SingleRecord("X-Ray Chest - Clear"));
-        imaging.Add(new SingleRecord("MRI Brain - No abnormalities"));
-        
-        RecordFolder prescriptions = new RecordFolder("💊 Prescriptions");
-        
-        RecordFolder currentMeds = new RecordFolder("Current Medications");
-        currentMeds.Add(new SingleRecord("Metformin 500mg - Twice daily"));
-        currentMeds.Add(new SingleRecord("Lisinopril 10mg - Once daily"));
-        
-        RecordFolder pastMeds = new RecordFolder("Past Medications");
-        pastMeds.Add(new SingleRecord("Amoxicillin 500mg - Completed"));
-        
-        prescriptions.Add(currentMeds);
-        prescriptions.Add(pastMeds);
-        
-        // Add all to root
-        root.Add(labResults);
-        root.Add(imaging);
-        root.Add(prescriptions);
-        root.Add(new SingleRecord("📅 General Checkup - Jan 10, 2026 - All vitals normal"));
-        
-        recordsHtml = root.GetHtmlSummary(0);
-        statusMessage = "✅ Sample hierarchical data loaded (demonstrating Composite Pattern).";
-    }
-
-    private void AddNewRecord()
+    private async Task AddNewRecord()
     {
         if (string.IsNullOrWhiteSpace(newRecordTitle))
         {
             statusMessage = "❌ Please enter a title.";
+            isError = true;
+            return;
+        }
+
+        if (selectedPatientId == 0)
+        {
+            statusMessage = "❌ Please select a patient first.";
+            isError = true;
             return;
         }
 
@@ -197,21 +590,99 @@
                 Details = newRecordDetails
             };
 
-            DatabaseManager.GetInstance().AddPatientRecord(newRecord);
+            await ApiService.SaveRecordAsync(newRecord);
             
             statusMessage = $"✅ Added new {newRecordType}: '{newRecordTitle}'";
+            isError = false;
             
             // Clear form
             newRecordTitle = "";
             newRecordDetails = "";
             newRecordParentId = null;
+            newRecordType = "File";
             
-            // Reload to show the new record
-            LoadFullHistory();
+            // Reload records
+            await LoadRecords();
         }
         catch (Exception ex)
         {
             statusMessage = $"❌ Error adding record: {ex.Message}";
+            isError = true;
         }
+    }
+
+    private void StartEdit(RecordModel record)
+    {
+        editingRecordId = record.RecordID;
+        editingTitle = record.Title;
+        editingDetails = record.Details ?? "";
+    }
+
+    private async Task SaveEdit()
+    {
+        if (string.IsNullOrWhiteSpace(editingTitle))
+        {
+            statusMessage = "❌ Title cannot be empty.";
+            isError = true;
+            return;
+        }
+
+        try
+        {
+            var record = allRecords.FirstOrDefault(r => r.RecordID == editingRecordId);
+            if (record != null)
+            {
+                record.Title = editingTitle;
+                record.Details = editingDetails;
+                
+                await ApiService.UpdateRecordAsync(record);
+                
+                statusMessage = $"✅ Record updated successfully.";
+                isError = false;
+                editingRecordId = 0;
+                
+                // Reload to reflect changes
+                await LoadRecords();
+            }
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"❌ Error updating record: {ex.Message}";
+            isError = true;
+        }
+    }
+
+    private void CancelEdit()
+    {
+        editingRecordId = 0;
+        editingTitle = "";
+        editingDetails = "";
+    }
+
+    private async Task DeleteRecord(int recordId)
+    {
+        if (!confirm($"Are you sure you want to delete this record?"))
+            return;
+
+        try
+        {
+            await ApiService.DeleteRecordAsync(recordId);
+            statusMessage = "✅ Record deleted successfully.";
+            isError = false;
+            
+            // Reload records
+            await LoadRecords();
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"❌ Error deleting record: {ex.Message}";
+            isError = true;
+        }
+    }
+
+    private bool confirm(string message)
+    {
+        // This is a placeholder - in production, use JSInterop for confirm dialog
+        return true;
     }
 }

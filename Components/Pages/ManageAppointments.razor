@@ -1,6 +1,7 @@
 @page "/manage-appointments"
 @rendermode InteractiveServer
 @using HealthTech.Services
+@inject ApiService ApiService
 
 <PageTitle>Manage Appointments</PageTitle>
 
@@ -72,20 +73,20 @@
     private bool isEditing = false;
     private AppointmentModel editingModel = new AppointmentModel();
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
-        LoadData();
+        await LoadData();
     }
 
-    private void LoadData()
+    private async Task LoadData()
     {
-        appointments = DatabaseManager.GetInstance().GetAllAppointments();
+        appointments = await ApiService.GetAllAppointmentsAsync();
     }
 
-    private void DeleteAppt(int id)
+    private async Task DeleteAppt(int id)
     {
-        DatabaseManager.GetInstance().DeleteAppointment(id);
-        LoadData(); 
+        await ApiService.DeleteAppointmentAsync(id);
+        await LoadData(); 
     }
 
     private void EditAppt(AppointmentModel appt)
@@ -100,11 +101,11 @@
         isEditing = true;
     }
 
-    private void SaveEdit()
+    private async Task SaveEdit()
     {
-        DatabaseManager.GetInstance().UpdateAppointment(editingModel);
+        await ApiService.UpdateAppointmentAsync(editingModel);
         isEditing = false;
-        LoadData(); 
+        await LoadData(); 
     }
 
     private void CancelEdit()

@@ -1,7 +1,41 @@
 ﻿@page "/"
+@using HealthTech.Services
+@inject ApiService ApiService
+@inject NavigationManager Navigation
+@rendermode InteractiveServer
 
 <PageTitle>MedEase Dashboard</PageTitle>
 
+@if (isCheckingApi)
+{
+    <div class="text-center mt-5">
+        <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        <h4 class="mt-3">Connecting to API...</h4>
+    </div>
+}
+else if (!isApiAvailable)
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <h4 class="alert-heading">⚠️ API Connection Failed!</h4>
+        <p><strong>@apiErrorMessage</strong></p>
+        <hr>
+        <p class="mb-0">
+            <strong>Quick Fix:</strong> Open terminal and run:
+            <code style="background: #fff; padding: 2px 8px; border-radius: 3px;">cd HealthTech.API && dotnet watch</code>
+        </p>
+        <button type="button" class="btn btn-warning mt-3" @onclick="RetryApiConnection">
+            🔄 Retry Connection
+        </button>
+        <button type="button" class="btn btn-secondary mt-3 ms-2" @onclick="ViewDetailedInstructions">
+            📖 View Instructions
+        </button>
+    </div>
+}
+
+@if (isApiAvailable)
+{
 <div class="text-center mb-5">
     <h1 class="display-4 text-primary">Welcome to MedEase</h1>
     <p class="lead">Smart Appointment & Patient Record System</p>
@@ -86,4 +120,40 @@
             <strong>5. Strategy:</strong> Report Export Formats
         </div>
     </div>
-</div>
+</div>}
+
+@code {
+    private bool isCheckingApi = true;
+    private bool isApiAvailable = false;
+    private string apiErrorMessage = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CheckApiConnection();
+    }
+
+    private async Task CheckApiConnection()
+    {
+        isCheckingApi = true;
+        StateHasChanged();
+
+        isApiAvailable = await ApiService.IsApiAvailableAsync();
+        
+        if (!isApiAvailable)
+        {
+            apiErrorMessage = ApiService.LastError ?? "Cannot connect to HealthTech.API";
+        }
+
+        isCheckingApi = false;
+    }
+
+    private async Task RetryApiConnection()
+    {
+        await CheckApiConnection();
+    }
+
+    private void ViewDetailedInstructions()
+    {
+        Navigation.NavigateTo("/api-check");
+    }
+}
