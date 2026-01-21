@@ -341,11 +341,40 @@ public void AddAppointment(AppointmentModel appt)
                             {
                                 RecordID = Convert.ToInt32(reader["recordID"]),
                                 PatientID = Convert.ToInt32(reader["patientID"]),
-                                ParentFolderID = reader["parentFolderID"] == DBNull.Value ? null : (int?)Convert.ToInt32(reader["parentFolderID"]),
                                 RecordType = reader["recordType"].ToString() ?? "",
                                 Title = reader["title"].ToString() ?? "",
                                 Details = reader["details"].ToString() ?? ""
                             };
+                            
+                            // Try to read InFolder (new name) or parentFolderID (old name)
+                            try
+                            {
+                                int inFolderIndex = reader.GetOrdinal("InFolder");
+                                record.InFolder = reader[inFolderIndex] != DBNull.Value ? (int?)Convert.ToInt32(reader[inFolderIndex]) : null;
+                            }
+                            catch
+                            {
+                                try
+                                {
+                                    int parentIndex = reader.GetOrdinal("parentFolderID");
+                                    record.InFolder = reader[parentIndex] != DBNull.Value ? (int?)Convert.ToInt32(reader[parentIndex]) : null;
+                                }
+                                catch
+                                {
+                                    record.InFolder = null;
+                                }
+                            }
+                            
+                            // Try to read FolderName if column exists
+                            try
+                            {
+                                int folderNameIndex = reader.GetOrdinal("FolderName");
+                                record.FolderName = reader[folderNameIndex] != DBNull.Value ? reader[folderNameIndex].ToString() ?? "" : "";
+                            }
+                            catch
+                            {
+                                record.FolderName = "";
+                            }
                             
                             // Set timestamps if columns exist
                             if (hasTimestamps)
@@ -390,22 +419,81 @@ public void AddAppointment(AppointmentModel appt)
                     hasTimestamps = false;
                 }
                 
-                string sql = hasTimestamps
-                    ? @"INSERT INTO PatientRecord 
-                       (patientID, parentFolderID, recordType, title, details, createdDate, lastUpdated) 
-                       VALUES (@pid, @parentId, @type, @title, @details, NOW(), NOW())"
-                    : @"INSERT INTO PatientRecord 
-                       (patientID, parentFolderID, recordType, title, details) 
-                       VALUES (@pid, @parentId, @type, @title, @details)";
+                // Check if FolderName column exists
+                bool hasFolderName = false;
+                try
+                {
+                    string checkSql = "SELECT FolderName FROM PatientRecord LIMIT 1";
+                    using (var checkCmd = new MySqlCommand(checkSql, conn))
+                    {
+                        checkCmd.ExecuteScalar();
+                        hasFolderName = true;
+                    }
+                }
+                catch (MySqlException)
+                {
+                    hasFolderName = false;
+                }
+                
+                // Check if InFolder column exists (new name)
+                bool hasInFolder = false;
+                try
+                {
+                    string checkSql = "SELECT InFolder FROM PatientRecord LIMIT 1";
+                    using (var checkCmd = new MySqlCommand(checkSql, conn))
+                    {
+                        checkCmd.ExecuteScalar();
+                        hasInFolder = true;
+                    }
+                }
+                catch (MySqlException)
+                {
+                    hasInFolder = false;
+                }
+                
+                string columnName = hasInFolder ? "InFolder" : "parentFolderID";
+                
+                string sql;
+                if (hasTimestamps && hasFolderName)
+                {
+                    sql = $@"INSERT INTO PatientRecord 
+                           (patientID, {columnName}, recordType, title, details, FolderName, createdDate, lastUpdated) 
+                           VALUES (@pid, @parentId, @type, @title, @details, @folderName, NOW(), NOW())";
+                }
+                else if (hasTimestamps)
+                {
+                    sql = $@"INSERT INTO PatientRecord 
+                           (patientID, {columnName}, recordType, title, details, createdDate, lastUpdated) 
+                           VALUES (@pid, @parentId, @type, @title, @details, NOW(), NOW())";
+                }
+                else if (hasFolderName)
+                {
+                    sql = $@"INSERT INTO PatientRecord 
+                           (patientID, {columnName}, recordType, title, details, FolderName) 
+                           VALUES (@pid, @parentId, @type, @title, @details, @folderName)";
+                }
+                else
+                {
+                    sql = $@"INSERT INTO PatientRecord 
+                           (patientID, {columnName}, recordType, title, details) 
+                           VALUES (@pid, @parentId, @type, @title, @details)";
+                }
                 
                 using (var cmd = new MySqlCommand(sql, conn))
                 {
                     cmd.Parameters.AddWithValue("@pid", record.PatientID);
-                    cmd.Parameters.AddWithValue("@parentId", record.ParentFolderID.HasValue ? (object)record.ParentFolderID.Value : DBNull.Value);
+                    cmd.Parameters.AddWithValue("@parentId", record.InFolder.HasValue ? (object)record.InFolder.Value : DBNull.Value);
                     cmd.Parameters.AddWithValue("@type", record.RecordType);
                     cmd.Parameters.AddWithValue("@title", record.Title);
                     cmd.Parameters.AddWithValue("@details", record.Details ?? "");
+                    if (hasFolderName)
+                    {
+                        cmd.Parameters.AddWithValue("@folderName", record.FolderName ?? "");
+                    }
                     cmd.ExecuteNonQuery();
+                    
+                    // Get the auto-generated RecordID
+                    record.RecordID = (int)cmd.LastInsertedId;
                 }
             }
         }
@@ -432,19 +520,57 @@ public void AddAppointment(AppointmentModel appt)
                     hasTimestamps = false;
                 }
                 
-                string sql = hasTimestamps
-                    ? @"UPDATE PatientRecord 
-                       SET title = @title, details = @details, lastUpdated = NOW() 
-                       WHERE recordID = @rid"
-                    : @"UPDATE PatientRecord 
-                       SET title = @title, details = @details 
-                       WHERE recordID = @rid";
+                // Check if FolderName column exists
+                bool hasFolderName = false;
+                try
+                {
+                    string checkSql = "SELECT FolderName FROM PatientRecord LIMIT 1";
+                    using (var checkCmd = new MySqlCommand(checkSql, conn))
+                    {
+                        checkCmd.ExecuteScalar();
+                        hasFolderName = true;
+                    }
+                }
+                catch (MySqlException)
+                {
+                    hasFolderName = false;
+                }
+                
+                string sql;
+                if (hasTimestamps && hasFolderName)
+                {
+                    sql = @"UPDATE PatientRecord 
+                           SET title = @title, details = @details, FolderName = @folderName, lastUpdated = NOW() 
+                           WHERE recordID = @rid";
+                }
+                else if (hasTimestamps)
+                {
+                    sql = @"UPDATE PatientRecord 
+                           SET title = @title, details = @details, lastUpdated = NOW() 
+                           WHERE recordID = @rid";
+                }
+                else if (hasFolderName)
+                {
+                    sql = @"UPDATE PatientRecord 
+                           SET title = @title, details = @details, FolderName = @folderName 
+                           WHERE recordID = @rid";
+                }
+                else
+                {
+                    sql = @"UPDATE PatientRecord 
+                           SET title = @title, details = @details 
+                           WHERE recordID = @rid";
+                }
                 
                 using (var cmd = new MySqlCommand(sql, conn))
                 {
                     cmd.Parameters.AddWithValue("@rid", record.RecordID);
                     cmd.Parameters.AddWithValue("@title", record.Title);
                     cmd.Parameters.AddWithValue("@details", record.Details ?? "");
+                    if (hasFolderName)
+                    {
+                        cmd.Parameters.AddWithValue("@folderName", record.FolderName ?? "");
+                    }
                     cmd.ExecuteNonQuery();
                 }
             }
@@ -457,7 +583,24 @@ public void AddAppointment(AppointmentModel appt)
             {
                 conn.Open();
                 // First, recursively delete all children
-                string deleteSql = "DELETE FROM PatientRecord WHERE recordID = @rid OR parentFolderID = @rid";
+                // Check which column name exists
+                bool hasInFolder = false;
+                try
+                {
+                    string checkSql = "SELECT InFolder FROM PatientRecord LIMIT 1";
+                    using (var checkCmd = new MySqlCommand(checkSql, conn))
+                    {
+                        checkCmd.ExecuteScalar();
+                        hasInFolder = true;
+                    }
+                }
+                catch (MySqlException)
+                {
+                    hasInFolder = false;
+                }
+                
+                string columnName = hasInFolder ? "InFolder" : "parentFolderID";
+                string deleteSql = $"DELETE FROM PatientRecord WHERE recordID = @rid OR {columnName} = @rid";
                 using (var cmd = new MySqlCommand(deleteSql, conn))
                 {
                     cmd.Parameters.AddWithValue("@rid", recordId);

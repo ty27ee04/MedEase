@@ -113,23 +113,9 @@
             </div>
         </div>
 
-        <!-- View Toggle -->
-        <div class="btn-group mb-3" role="group">
-            <button type="button" class="btn @(viewMode == "list" ? "btn-primary" : "btn-outline-primary")" 
-                    @onclick='() => viewMode = "list"'>
-                📑 List View (by Date)
-            </button>
-            <button type="button" class="btn @(viewMode == "tree" ? "btn-primary" : "btn-outline-primary")" 
-                    @onclick='() => viewMode = "tree"'>
-                🌳 Tree View (Hierarchical)
-            </button>
-        </div>
-
         <div class="row">
             <div class="col-md-8">
-                @if (viewMode == "list")
-                {
-                    <!-- Date-Based List View -->
+                <!-- Date-Based List View -->
                     <div class="card mb-3">
                         <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
                             <strong>📑 Records List (by Date)</strong>
@@ -165,85 +151,149 @@
                             else
                             {
                                 <div class="list-group">
-                                    @foreach (var record in filteredRecords.OrderByDescending(r => r.CreatedAt))
+                                    @* Show root-level records (folders and standalone files) sorted by date *@
+                                    @foreach (var record in filteredRecords.Where(r => !r.InFolder.HasValue).OrderByDescending(r => r.CreatedAt))
                                     {
                                         <div class="list-group-item @(editingRecordId == record.RecordID ? "border-primary" : "") @(selectedRecordId == record.RecordID ? "border-success border-2" : "") clickable-record" 
-                                             @onclick="() => ViewRecordDetails(record.RecordID)"
+                                             @onclick="() => HandleRecordClick(record)"
                                              style="cursor: pointer;">
-                                            <div class="d-flex justify-content-between align-items-start">
-                                                <div class="flex-grow-1">
-                                                    @if (editingRecordId == record.RecordID)
-                                                    {
-                                                        <!-- Edit Mode -->
-                                                        <div class="mb-2" @onclick:stopPropagation="true">
-                                                            <input class="form-control mb-2" @bind="editingTitle" placeholder="Title" />
-                                                            <textarea class="form-control mb-2" @bind="editingDetails" rows="3" placeholder="Details"></textarea>
-                                                        </div>
-                                                    }
-                                                    else
-                                                    {
-                                                        <!-- View Mode -->
-                                                        <div class="d-flex align-items-center mb-1">
-                                                            <span class="badge @(record.RecordType == "Folder" ? "bg-warning text-dark" : "bg-info") me-2">
-                                                                @(record.RecordType == "Folder" ? "📂" : "📄") @record.RecordType
-                                                            </span>
-                                                            <h6 class="mb-0">@record.Title</h6>
-                                                        </div>
-                                                        @if (!string.IsNullOrEmpty(record.Details))
+                                                <div class="d-flex justify-content-between align-items-start">
+                                                    <div class="flex-grow-1">
+                                                        @if (editingRecordId == record.RecordID)
                                                         {
-                                                            <p class="mb-1 text-muted small">@record.Details</p>
-                                                        }
-                                                        <div class="d-flex justify-content-between align-items-center">
-                                                            <small class="text-muted">ID: @record.RecordID @(record.ParentFolderID.HasValue ? $"| Parent: {record.ParentFolderID}" : "")</small>
-                                                            <div class="text-end">
-                                                                <small class="text-muted d-block">Created: @record.CreatedAt.ToString("MMM dd, yyyy HH:mm")</small>
-                                                                @if (Math.Abs((record.UpdatedAt - record.CreatedAt).TotalSeconds) > 1)
-                                                                {
-                                                                    <small class="text-warning d-block">Updated: @record.UpdatedAt.ToString("MMM dd, yyyy HH:mm")</small>
-                                                                }
+                                                            <!-- Edit Mode -->
+                                                            <div class="mb-2" @onclick:stopPropagation="true">
+                                                                <input class="form-control mb-2" @bind="editingTitle" placeholder="Title" />
+                                                                <textarea class="form-control mb-2" @bind="editingDetails" rows="3" placeholder="Details"></textarea>
                                                             </div>
-                                                        </div>
-                                                    }
-                                                </div>
-                                                <div class="ms-2" @onclick:stopPropagation="true">
-                                                    @if (editingRecordId == record.RecordID)
-                                                    {
-                                                        <button class="btn btn-sm btn-success me-1" @onclick="SaveEdit">💾 Save</button>
-                                                        <button class="btn btn-sm btn-secondary" @onclick="CancelEdit">✖ Cancel</button>
-                                                    }
-                                                    else
-                                                    {
-                                                        <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => StartEdit(record)">✏️ Edit</button>
-                                                        <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteRecord(record.RecordID)">🗑️</button>
-                                                    }
+                                                        }
+                                                        else
+                                                        {
+                                                            <!-- View Mode -->
+                                                            <div class="d-flex align-items-center mb-1">
+                                                                @if (record.RecordType == "Folder")
+                                                                {
+                                                                    <span class="me-2">
+                                                                        @(expandedFolders.Contains(record.RecordID) ? "📂" : "📁")
+                                                                    </span>
+                                                                }
+                                                                <span class="badge @(record.RecordType == "Folder" ? "bg-warning text-dark" : "bg-info") me-2">
+                                                                    @(record.RecordType == "Folder" ? "Folder" : "File")
+                                                                </span>
+                                                                @if (record.RecordType == "Folder" && !string.IsNullOrEmpty(record.FolderName))
+                                                                {
+                                                                    <h6 class="mb-0 text-primary fw-bold">@record.FolderName</h6>
+                                                                    <span class="mx-2 text-muted">|</span>
+                                                                }
+                                                                <h6 class="mb-0">@record.Title</h6>
+                                                            </div>
+                                                            @if (!string.IsNullOrEmpty(record.Details))
+                                                            {
+                                                                <p class="mb-1 text-muted small">@record.Details</p>
+                                                            }
+                                                            <div class="d-flex justify-content-between align-items-center">
+                                                                <small class="text-muted">
+                                                                    ID: @record.RecordID 
+                                                                    @if (record.RecordType == "Folder")
+                                                                    {
+                                                                        var filesCount = allRecords.Count(r => r.InFolder == record.RecordID);
+                                                                        <span class="badge bg-secondary ms-2">@filesCount file(s)</span>
+                                                                    }
+                                                                    @if (record.InFolder.HasValue)
+                                                                    {
+                                                                        <text>| In Folder: @record.InFolder</text>
+                                                                    }
+                                                                </small>
+                                                                <div class="text-end">
+                                                                    <small class="text-muted d-block">Created: @record.CreatedAt.ToString("MMM dd, yyyy HH:mm")</small>
+                                                                    @if (Math.Abs((record.UpdatedAt - record.CreatedAt).TotalSeconds) > 1)
+                                                                    {
+                                                                        <small class="text-warning d-block">Updated: @record.UpdatedAt.ToString("MMM dd, yyyy HH:mm")</small>
+                                                                    }
+                                                                </div>
+                                                            </div>
+                                                        }
+                                                    </div>
+                                                    <div class="ms-2" @onclick:stopPropagation="true">
+                                                        @if (editingRecordId == record.RecordID)
+                                                        {
+                                                            <button class="btn btn-sm btn-success me-1" @onclick="SaveEdit">💾 Save</button>
+                                                            <button class="btn btn-sm btn-secondary" @onclick="CancelEdit">✖ Cancel</button>
+                                                        }
+                                                        else
+                                                        {
+                                                            <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => StartEdit(record)">✏️ Edit</button>
+                                                            <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteRecord(record.RecordID)">🗑️</button>
+                                                        }
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
+
+                                        @* If it's a folder and expanded, show its files directly below *@
+                                        @if (record.RecordType == "Folder" && expandedFolders.Contains(record.RecordID))
+                                        {
+                                            @foreach (var childFile in filteredRecords.Where(r => r.InFolder == record.RecordID).OrderByDescending(r => r.CreatedAt))
+                                            {
+                                                <div class="list-group-item @(editingRecordId == childFile.RecordID ? "border-primary" : "") @(selectedRecordId == childFile.RecordID ? "border-success border-2" : "") clickable-record" 
+                                                     @onclick="() => HandleRecordClick(childFile)"
+                                                     style="cursor: pointer; margin-left: 30px; border-left: 3px solid #ffc107;">
+                                                    <div class="d-flex justify-content-between align-items-start">
+                                                        <div class="flex-grow-1">
+                                                            @if (editingRecordId == childFile.RecordID)
+                                                            {
+                                                                <!-- Edit Mode -->
+                                                                <div class="mb-2" @onclick:stopPropagation="true">
+                                                                    <input class="form-control mb-2" @bind="editingTitle" placeholder="Title" />
+                                                                    <textarea class="form-control mb-2" @bind="editingDetails" rows="3" placeholder="Details"></textarea>
+                                                                </div>
+                                                            }
+                                                            else
+                                                            {
+                                                                <!-- View Mode -->
+                                                                <div class="d-flex align-items-center mb-1">
+                                                                    <span class="badge bg-info me-2">File</span>
+                                                                    <h6 class="mb-0">@childFile.Title</h6>
+                                                                </div>
+                                                                @if (!string.IsNullOrEmpty(childFile.Details))
+                                                                {
+                                                                    <p class="mb-1 text-muted small">@childFile.Details</p>
+                                                                }
+                                                                <div class="d-flex justify-content-between align-items-center">
+                                                                    <small class="text-muted">
+                                                                        ID: @childFile.RecordID | In Folder: @childFile.InFolder
+                                                                    </small>
+                                                                    <div class="text-end">
+                                                                        <small class="text-muted d-block">Created: @childFile.CreatedAt.ToString("MMM dd, yyyy HH:mm")</small>
+                                                                        @if (Math.Abs((childFile.UpdatedAt - childFile.CreatedAt).TotalSeconds) > 1)
+                                                                        {
+                                                                            <small class="text-warning d-block">Updated: @childFile.UpdatedAt.ToString("MMM dd, yyyy HH:mm")</small>
+                                                                        }
+                                                                    </div>
+                                                                </div>
+                                                            }
+                                                        </div>
+                                                        <div class="ms-2" @onclick:stopPropagation="true">
+                                                            @if (editingRecordId == childFile.RecordID)
+                                                            {
+                                                                <button class="btn btn-sm btn-success me-1" @onclick="SaveEdit">💾 Save</button>
+                                                                <button class="btn btn-sm btn-secondary" @onclick="CancelEdit">✖ Cancel</button>
+                                                            }
+                                                            else
+                                                            {
+                                                                <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => StartEdit(childFile)">✏️ Edit</button>
+                                                                <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteRecord(childFile.RecordID)">🗑️</button>
+                                                            }
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            }
+                                        }
                                     }
                                 </div>
                             }
                         </div>
                     </div>
-                }
-                else
-                {
-                    <!-- Tree View -->
-                    <div class="card">
-                        <div class="card-header bg-info text-white">
-                            <strong>🌳 Hierarchical View (Composite Pattern)</strong>
-                        </div>
-                        <div class="card-body">
-                            @if (string.IsNullOrEmpty(recordsHtml))
-                            {
-                                <em class="text-muted">Loading tree view...</em>
-                            }
-                            else
-                            {
-                                @((MarkupString)recordsHtml)
-                            }
-                        </div>
-                    </div>
-                }
             </div>
 
             <div class="col-md-4">
@@ -253,26 +303,48 @@
                         <strong>➕ Add New Record</strong>
                     </div>
                     <div class="card-body">
-                        <div class="mb-2">
-                            <label class="form-label">Title *</label>
-                            <input class="form-control" @bind="newRecordTitle" placeholder="e.g., Blood Test Results" />
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Record Type</label>
+                            <select class="form-control" @bind="newRecordType" @bind:after="OnRecordTypeChanged">
+                                <option value="File">📄 Single Case (File)</option>
+                                <option value="Folder">📂 New Folder (Multiple Cases)</option>
+                            </select>
                         </div>
-                        <div class="mb-2">
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Title *</label>
+                            <input class="form-control" @bind="newRecordTitle" placeholder="e.g., Blood Test Results" />
+                            @if (newRecordType == "Folder")
+                            {
+                                <small class="text-muted">This will be used as the folder name</small>
+                            }
+                        </div>
+
+                        <div class="mb-3">
                             <label class="form-label">Details</label>
                             <textarea class="form-control" @bind="newRecordDetails" placeholder="Details..." rows="3"></textarea>
                         </div>
-                        <div class="mb-2">
-                            <label class="form-label">Type</label>
-                            <select class="form-control" @bind="newRecordType">
-                                <option value="File">📄 File (Leaf)</option>
-                                <option value="Folder">📂 Folder (Composite)</option>
-                            </select>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Parent Folder ID (optional)</label>
-                            <input class="form-control" type="number" @bind="newRecordParentId" placeholder="Leave empty for root" />
-                        </div>
-                        <button class="btn btn-primary w-100" @onclick="AddNewRecord">➕ Add Record</button>
+
+                        @if (newRecordType == "File" && availableFolders.Count > 0)
+                        {
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Add to Existing Folder?</label>
+                                <select class="form-control" @bind="newRecordParentId">
+                                    <option value="">-- New Separate Case --</option>
+                                    @foreach (var folder in availableFolders)
+                                    {
+                                        <option value="@folder.RecordID">
+                                            📂 @folder.FolderName (@folder.Title)
+                                        </option>
+                                    }
+                                </select>
+                                <small class="text-muted">Select a folder to add this case to an existing folder, or leave as separate case</small>
+                            </div>
+                        }
+
+                        <button class="btn btn-primary w-100" @onclick="AddNewRecord">
+                            ➕ Add @(newRecordType == "Folder" ? "Folder" : "Record")
+                        </button>
                     </div>
                 </div>
 
@@ -334,22 +406,23 @@
     // Records data
     private List<RecordModel> allRecords = new List<RecordModel>();
     private List<RecordModel> filteredRecords = new List<RecordModel>();
+    private List<RecordModel> availableFolders = new List<RecordModel>();
     private string recordSearchQuery = "";
     private DateTime? selectedDate = null;
     private int selectedRecordId = 0;
-
-    // View mode
-    private string viewMode = "list"; // "list" or "tree"
-    private string recordsHtml = "";
 
     // Status
     private string statusMessage = "";
     private bool isError = false;
 
+    // Expanded folders tracking
+    private HashSet<int> expandedFolders = new HashSet<int>();
+
     // Form fields for adding new records
     private string newRecordTitle = "";
     private string newRecordDetails = "";
     private string newRecordType = "File";
+    private string newFolderName = "";
     private int? newRecordParentId = null;
 
     // Editing
@@ -418,7 +491,6 @@
             currentPatient = null;
             allRecords.Clear();
             filteredRecords.Clear();
-            recordsHtml = "";
             return;
         }
 
@@ -431,13 +503,18 @@
         if (selectedPatientId == 0) return;
 
         allRecords = await ApiService.GetRecordsByPatientAsync(selectedPatientId);
-        filteredRecords = allRecords.OrderBy(r => r.Title).ToList();
-
-        // Load tree view
-        if (viewMode == "tree")
-        {
-            LoadTreeView();
-        }
+        
+        // Load available folders for selection
+        availableFolders = allRecords
+            .Where(r => r.RecordType == "Folder")
+            .OrderByDescending(r => r.CreatedAt)
+            .ToList();
+        
+        // Apply filtering to update the displayed list
+        FilterRecords();
+        
+        // Force UI update
+        await InvokeAsync(StateHasChanged);
     }
 
     private void FilterRecords()
@@ -493,74 +570,39 @@
         return allRecords.Count(r => r.CreatedAt.Date == date.Date);
     }
 
-    private void ViewRecordDetails(int recordId)
+    private void HandleRecordClick(RecordModel record)
     {
-        selectedRecordId = recordId;
-        // Future enhancement: Show record history or details panel
-    }
-
-    private void LoadTreeView()
-    {
-        try
+        // If it's a folder, toggle expand/collapse
+        if (record.RecordType == "Folder")
         {
-            if (allRecords.Count == 0)
-            {
-                recordsHtml = "<em class='text-muted'>No records found for this patient.</em>";
-                return;
-            }
-
-            RecordFolder root = BuildRecordTree(allRecords);
-            recordsHtml = root.GetHtmlSummary(0);
+            ToggleFolder(record.RecordID);
         }
-        catch (Exception ex)
+        else
         {
-            recordsHtml = $"<em style='color:red;'>Error loading tree: {ex.Message}</em>";
+            // For files, just select them
+            selectedRecordId = record.RecordID;
         }
     }
 
-    private RecordFolder BuildRecordTree(List<RecordModel> allRecords)
+    private void ToggleFolder(int folderId)
     {
-        RecordFolder root = new RecordFolder("📋 Complete Medical History");
-        
-        // Dictionary to store folders by their RecordID for quick lookup
-        Dictionary<int, RecordFolder> folderMap = new Dictionary<int, RecordFolder>();
-        
-        // First pass: Create all folders and single records
-        foreach (var record in allRecords)
+        if (expandedFolders.Contains(folderId))
         {
-            if (record.RecordType == "Folder")
-            {
-                var folder = new RecordFolder($"{record.Title} (ID: {record.RecordID})");
-                folderMap[record.RecordID] = folder;
-            }
+            expandedFolders.Remove(folderId);
         }
-        
-        // Second pass: Build the hierarchy
-        foreach (var record in allRecords)
+        else
         {
-            MedicalComponent component;
-            
-            if (record.RecordType == "Folder")
-            {
-                component = folderMap[record.RecordID];
-            }
-            else
-            {
-                component = new SingleRecord($"{record.Title} - {record.Details}");
-            }
-            
-            // Add to parent or root
-            if (record.ParentFolderID.HasValue && folderMap.ContainsKey(record.ParentFolderID.Value))
-            {
-                folderMap[record.ParentFolderID.Value].Add(component);
-            }
-            else
-            {
-                root.Add(component);
-            }
+            expandedFolders.Add(folderId);
         }
-        
-        return root;
+    }
+
+    private void OnRecordTypeChanged()
+    {
+        // Clear folder name when switching away from folder type
+        if (newRecordType != "Folder")
+        {
+            newFolderName = "";
+        }
     }
 
     private async Task AddNewRecord()
@@ -584,25 +626,51 @@
             var newRecord = new RecordModel
             {
                 PatientID = selectedPatientId,
-                ParentFolderID = newRecordParentId,
+                InFolder = newRecordParentId,
                 RecordType = newRecordType,
                 Title = newRecordTitle,
-                Details = newRecordDetails
+                Details = newRecordDetails,
+                FolderName = newRecordType == "Folder" ? newRecordTitle : "" // Use title as folder name
             };
 
+            Console.WriteLine($"DEBUG: Saving record - PatientID: {newRecord.PatientID}, Title: {newRecord.Title}, Type: {newRecord.RecordType}");
+            
             await ApiService.SaveRecordAsync(newRecord);
             
-            statusMessage = $"✅ Added new {newRecordType}: '{newRecordTitle}'";
+            Console.WriteLine($"DEBUG: Record saved with ID: {newRecord.RecordID}");
+            
+            if (newRecordType == "Folder")
+            {
+                statusMessage = $"✅ Created new folder: '{newRecordTitle}' (ID: {newRecord.RecordID})";
+            }
+            else if (newRecordParentId.HasValue)
+            {
+                var parentFolder = availableFolders.FirstOrDefault(f => f.RecordID == newRecordParentId.Value);
+                statusMessage = $"✅ Added '{newRecordTitle}' to folder '{parentFolder?.FolderName}' (ID: {newRecord.RecordID})";
+            }
+            else
+            {
+                statusMessage = $"✅ Added new separate case: '{newRecordTitle}' (ID: {newRecord.RecordID})";
+            }
+            
             isError = false;
             
             // Clear form
             newRecordTitle = "";
             newRecordDetails = "";
+            newFolderName = "";
             newRecordParentId = null;
             newRecordType = "File";
             
+            // Clear filters to show the new record
+            selectedDate = null;
+            recordSearchQuery = "";
+            
             // Reload records
             await LoadRecords();
+            
+            // Force UI refresh
+            StateHasChanged();
         }
         catch (Exception ex)
         {

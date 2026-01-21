@@ -44,10 +44,11 @@ namespace HealthTech.Services
     {
         public int RecordID { get; set; }
         public int PatientID { get; set; }
-        public int? ParentFolderID { get; set; } // The Composite Link
+        public int? InFolder { get; set; } // The Composite Link - which folder this record belongs to
         public string RecordType { get; set; } = "File"; // 'Folder' or 'File'
         public string Title { get; set; } = "";
         public string Details { get; set; } = "";
+        public string FolderName { get; set; } = ""; // Name for folders
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
     }

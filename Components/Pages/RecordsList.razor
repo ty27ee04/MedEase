@@ -129,10 +129,10 @@
                                         <small class="text-muted">
                                             <strong>Record ID:</strong> @record.RecordID
                                         </small>
-                                        @if (record.ParentFolderID.HasValue)
+                                        @if (record.InFolder.HasValue)
                                         {
                                             <small class="text-muted">
-                                                <strong>Parent:</strong> @record.ParentFolderID
+                                                <strong>In Folder:</strong> @record.InFolder
                                             </small>
                                         }
                                     </div>
@@ -205,10 +205,10 @@
                         <dt class="col-sm-4">Title:</dt>
                         <dd class="col-sm-8">@selectedRecord.Title</dd>
 
-                        @if (selectedRecord.ParentFolderID.HasValue)
+                        @if (selectedRecord.InFolder.HasValue)
                         {
-                            <dt class="col-sm-4">Parent Folder:</dt>
-                            <dd class="col-sm-8">@selectedRecord.ParentFolderID</dd>
+                            <dt class="col-sm-4">In Folder:</dt>
+                            <dd class="col-sm-8">@selectedRecord.InFolder</dd>
                         }
 
                         @if (!string.IsNullOrEmpty(selectedRecord.Details))
