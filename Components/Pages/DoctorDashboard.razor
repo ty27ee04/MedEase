@@ -41,6 +41,28 @@
 
     private void DownloadReport()
     {
+<<<<<<< HEAD
         exportResult = "Report generation has moved to the Reports page.";
     }
 }
+=======
+        // 1. Create the Context
+        ReportContext context = new ReportContext();
+
+        // 2. Set the Strategy based on user selection
+        // This is where the "Strategy" is swapped dynamically!
+        if (selectedFormat == "pdf")
+        {
+            context.SetStrategy(new PdfStrategy());
+        }
+        else if (selectedFormat == "csv")
+        {
+            context.SetStrategy(new CsvStrategy());
+        }
+
+        // 3. Execute the Strategy
+        // The context doesn't know if it's printing PDF or CSV, it just calls 'GenerateReport'
+        exportResult = context.GenerateReport("Daily Summary: 12 Patients, 3 Pending.");
+    }
+}
+>>>>>>> 422f23b6b42e05d1657dada3ee19136d19b15070
