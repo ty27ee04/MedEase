@@ -1,0 +1,312 @@
+@page "/book-appointment"
+@rendermode InteractiveServer
+@inject UserSession Session
+@inject NotificationService NotificationService
+@inject ApiService ApiService
+@using HealthTech.Services
+
+<PageTitle>Book Appointment</PageTitle>
+
+<h1>Book Appointment</h1>
+
+<div class="card p-4 shadow-sm">
+    <div class="row">
+        <div class="col-md-6 mb-3">
+            <label><strong>Patient:</strong></label>
+            <select class="form-control" @bind="selectedPatientId">
+                @foreach (var p in patients)
+                {
+                    <option value="@p.UserID">@p.Name (ID: @p.UserID)</option>
+                }
+            </select>
+        </div>
+
+        <div class="col-md-6 mb-3">
+            <label><strong>Doctor:</strong></label>
+            <select class="form-control" @bind="selectedDoctorId" @bind:after="OnDoctorChanged">
+                <option value="">-- Select Doctor --</option>
+                @foreach (var doctor in doctors)
+                {
+                    <option value="@doctor.UserID">@doctor.Name</option>
+                }
+            </select>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6 mb-3">
+            <label><strong>Type:</strong></label>
+            <select class="form-control" @bind="selectedType">
+                <option value="Physical">Physical (In-Person)</option>
+                <option value="Online">Online (Zoom)</option>
+            </select>
+        </div>
+
+        <div class="col-md-6 mb-3">
+             <label><strong>Room (Physical Only):</strong></label>
+             <select class="form-control" @bind="selectedRoomId" disabled="@(selectedType == "Online")">
+                 <option value="">-- No Room --</option>
+                 @foreach (var r in rooms)
+                 {
+                     <option value="@r.RoomID">Room @r.RoomNumber (@r.RoomType)</option>
+                 }
+             </select>
+        </div>
+    </div>
+
+    <hr />
+
+    <h5 class="mb-3">Select Date & Time</h5>
+    
+    <div class="row">
+        <div class="col-md-6 mb-3">
+            <label><strong>Select Date:</strong></label>
+            <input type="date" class="form-control" @bind="selectedDate" @bind:after="OnDateChanged" min="@DateTime.Today.ToString("yyyy-MM-dd")" />
+        </div>
+
+        <div class="col-md-6 mb-3">
+            <label><strong>Available Time Slots:</strong></label>
+            @if (isLoadingSlots)
+            {
+                <div class="text-center py-2">
+                    <span class="spinner-border spinner-border-sm"></span> Loading slots...
+                </div>
+            }
+            else if (availableSlots.Count == 0)
+            {
+                <div class="alert alert-warning mb-0">
+                    <small>No available time slots for this date. Doctor may be unavailable or all slots are booked.</small>
+                </div>
+            }
+            else
+            {
+                <select class="form-control" @bind="selectedTimeSlotString" @bind:after="OnTimeSlotChanged">
+                    <option value="">-- Select Time Slot --</option>
+                    @foreach (var slot in availableSlots)
+                    {
+                        if (slot.IsAvailable)
+                        {
+                            <option value="@slot.DateTime.ToString("O")">
+                                @slot.DateTime.ToString("hh:mm tt")
+                            </option>
+                        }
+                        else
+                        {
+                            <option value="" disabled>
+                                @slot.DateTime.ToString("hh:mm tt") - @slot.Reason
+                            </option>
+                        }
+                    }
+                </select>
+            }
+        </div>
+    </div>
+
+    @if (selectedDateTime.HasValue)
+    {
+        <div class="alert alert-info">
+            <strong>Selected:</strong> @selectedDateTime.Value.ToString("dd MMMM yyyy, hh:mm tt")
+        </div>
+    }
+
+    <button class="btn btn-primary w-100" @onclick="ProcessBooking" disabled="@(isProcessing || !selectedDateTime.HasValue)">
+        @if (isProcessing)
+        {
+            <span class="spinner-border spinner-border-sm me-2"></span>
+            <span>Processing...</span>
+        }
+        else
+        {
+            <span>Confirm Booking</span>
+        }
+    </button>
+</div>
+
+@if (!string.IsNullOrEmpty(bookingResult))
+{
+    <div class="alert @(isError ? "alert-danger" : "alert-success") mt-3">@bookingResult</div>
+}
+
+@code {
+    // Lists for Dropdowns
+    private List<User> patients = new List<User>();
+    private List<User> doctors = new List<User>();
+    private List<Room> rooms = new List<Room>();
+    private List<TimeSlot> availableSlots = new List<TimeSlot>();
+
+    // Form Selection Variables
+    private int selectedPatientId;
+    private int selectedDoctorId;
+    private int? selectedRoomId;
+    private string selectedType = "Physical";
+    private DateTime selectedDate = DateTime.Now.Date.AddDays(1); // Default to tomorrow
+    private DateTime? selectedDateTime = null;
+    private string selectedTimeSlotString = ""; // For dropdown binding
+    
+    private string bookingResult = "";
+    private bool isProcessing = false;
+    private bool isError = false;
+    private bool isLoadingSlots = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        patients = await ApiService.GetUsersByRoleAsync("Patient");
+        doctors = await ApiService.GetUsersByRoleAsync("Doctor");
+        rooms = await ApiService.GetAllRoomsAsync();
+
+        // Set defaults
+        if (patients.Count > 0) selectedPatientId = patients[0].UserID;
+        if (doctors.Count > 0) selectedDoctorId = doctors[0].UserID;
+        if (rooms.Count > 0) selectedRoomId = rooms[0].RoomID;
+        
+        // Load initial time slots for selected doctor and date
+        await LoadTimeSlots();
+    }
+
+    private async Task OnDoctorChanged()
+    {
+        selectedDateTime = null;
+        selectedTimeSlotString = "";
+        await LoadTimeSlots();
+    }
+
+    private async Task OnDateChanged()
+    {
+        selectedDateTime = null;
+        selectedTimeSlotString = "";
+        await LoadTimeSlots();
+    }
+
+    private async Task LoadTimeSlots()
+    {
+        isLoadingSlots = true;
+        StateHasChanged();
+
+        await Task.Delay(100); // Small delay for UI responsiveness
+
+        try
+        {
+            availableSlots = await ApiService.GetAvailableTimeSlotsAsync(selectedDoctorId, selectedDate, 30);
+        }
+        catch (Exception ex)
+        {
+            bookingResult = $"❌ Error loading time slots: {ex.Message}";
+            isError = true;
+            availableSlots = new List<TimeSlot>();
+        }
+        finally
+        {
+            isLoadingSlots = false;
+            StateHasChanged();
+        }
+    }
+
+    private void OnTimeSlotChanged()
+    {
+        if (!string.IsNullOrEmpty(selectedTimeSlotString))
+        {
+            try
+            {
+                selectedDateTime = DateTime.Parse(selectedTimeSlotString);
+                StateHasChanged();
+            }
+            catch
+            {
+                selectedDateTime = null;
+            }
+        }
+        else
+        {
+            selectedDateTime = null;
+        }
+    }
+
+    private async Task ProcessBooking()
+    {
+        isProcessing = true;
+        isError = false;
+        bookingResult = "";
+        StateHasChanged();
+
+        try 
+        {
+            if (!selectedDateTime.HasValue)
+            {
+                throw new Exception("Please select a date and time");
+            }
+
+            // Get patient and doctor details
+            var patient = patients.FirstOrDefault(p => p.UserID == selectedPatientId);
+            var doctor = doctors.FirstOrDefault(d => d.UserID == selectedDoctorId);
+
+            if (patient == null || doctor == null)
+            {
+                throw new Exception("Patient or Doctor not found");
+            }
+
+            // Validate contact information
+            if (string.IsNullOrEmpty(patient.Email) || string.IsNullOrEmpty(patient.Phone))
+            {
+                throw new Exception("Patient must have email and phone number for notifications");
+            }
+
+            // Double-check the time slot is still available
+            var slots = await ApiService.GetAvailableTimeSlotsAsync(selectedDoctorId, selectedDateTime.Value.Date, 30);
+            var selectedSlot = slots.FirstOrDefault(s => s.DateTime == selectedDateTime.Value);
+            
+            if (selectedSlot == null || !selectedSlot.IsAvailable)
+            {
+                throw new Exception("This time slot is no longer available. Please select another time.");
+            }
+
+            // Factory Logic
+            AppointmentFactory factory = new MedicalAppointmentFactory();
+            IAppointment appointmentObj = factory.CreateAppointment(selectedType);
+            string details = appointmentObj.GetBookingDetails();
+
+            // Create appointment
+            var newAppt = new AppointmentModel
+            {
+                PatientID = selectedPatientId,
+                DoctorID = selectedDoctorId,
+                RoomID = (selectedType == "Physical") ? selectedRoomId : null,
+                Type = selectedType,
+                DateTime = selectedDateTime.Value,
+                Status = "Confirmed",
+                Link = (selectedType == "Online") ? details : null,
+                PatientName = patient.Name,
+                DoctorName = doctor.Name
+            };
+
+            // Save to database
+            await ApiService.SaveAppointmentAsync(newAppt);
+
+            // Send notifications
+            await NotificationService.SendAppointmentConfirmationAsync(
+                patientName: patient.Name,
+                patientEmail: patient.Email,
+                patientPhone: patient.Phone,
+                doctorName: doctor.Name,
+                appointmentDate: newAppt.DateTime,
+                appointmentType: selectedType
+            );
+
+            bookingResult = $"✅ Success! Appointment booked for {selectedDateTime.Value:dd MMM yyyy, hh:mm tt}. Notifications sent to {patient.Name}";
+            isError = false;
+            
+            // Reset selection and reload slots
+            selectedDateTime = null;
+            await LoadTimeSlots();
+        }
+        catch (Exception ex)
+        {
+            bookingResult = $"❌ Error: {ex.Message}";
+            isError = true;
+        }
+        finally
+        {
+            isProcessing = false;
+            StateHasChanged();
+        }
+    }
+}

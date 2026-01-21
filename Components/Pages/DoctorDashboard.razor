@@ -1,0 +1,46 @@
+@page "/doctor-dashboard"
+@rendermode InteractiveServer
+@using HealthTech.Services
+
+<PageTitle>Doctor Dashboard</PageTitle>
+
+<h1>Doctor Dashboard & Analytics</h1>
+<p>Use the <strong>Strategy Pattern</strong> to export your daily statistics.</p>
+
+<div class="card p-4">
+    <h4>Daily Appointment Summary</h4>
+    <p>Total Patients Seen: <strong>12</strong></p>
+    <p>Pending Reviews: <strong>3</strong></p>
+
+    <hr />
+
+    <div class="mb-3">
+        <label>Select Export Format:</label>
+        <select class="form-control" @bind="selectedFormat">
+            <option value="pdf">PDF Document (.pdf)</option>
+            <option value="csv">Excel Spreadsheet (.csv)</option>
+        </select>
+    </div>
+
+    <button class="btn btn-primary" @onclick="DownloadReport">Generate Report</button>
+</div>
+
+@if (!string.IsNullOrEmpty(exportResult))
+{
+    <div class="card mt-4 bg-light">
+        <div class="card-body">
+            <h5>Output Preview:</h5>
+            <pre>@exportResult</pre>
+        </div>
+    </div>
+}
+
+@code {
+    private string selectedFormat = "pdf";
+    private string exportResult = "";
+
+    private void DownloadReport()
+    {
+        exportResult = "Report generation has moved to the Reports page.";
+    }
+}

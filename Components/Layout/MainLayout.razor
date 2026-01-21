@@ -1,0 +1,50 @@
+﻿@inherits LayoutComponentBase
+@inject NavigationManager Nav
+@inject HealthTech.Services.UserSession Session
+
+<div class="page">
+    <div class="sidebar">
+        <NavMenu />
+    </div>
+
+    <main>
+        <div class="top-row px-4">
+            @if (Session.CurrentUser != null)
+            {
+                <span class="me-3">Welcome, <strong>@Session.CurrentUser.Name</strong> (@Session.CurrentUser.Role)</span>
+                <button class="btn btn-sm btn-outline-danger" @onclick="Logout">Logout</button>
+            }
+            else 
+            {
+                <a href="login">Login</a>
+            }
+        </div>
+
+        <article class="content px-4">
+            @Body
+        </article>
+    </main>
+</div>
+
+@code {
+    protected override void OnAfterRender(bool firstRender)
+    {
+        // This runs every time the user moves to a new page
+        
+        // 1. Get current URL
+        var currentUrl = Nav.Uri.ToLower();
+
+        // 2. Check if user is NOT logged in AND they are NOT already on the login page
+        if (!Session.IsLoggedIn && !currentUrl.Contains("login"))
+        {
+            // 3. Force Redirect to Login
+            Nav.NavigateTo("login", forceLoad: true);
+        }
+    }
+
+    private void Logout()
+    {
+        Session.Logout();
+        Nav.NavigateTo("login");
+    }
+}

@@ -1,0 +1,159 @@
+﻿@page "/"
+@using HealthTech.Services
+@inject ApiService ApiService
+@inject NavigationManager Navigation
+@rendermode InteractiveServer
+
+<PageTitle>MedEase Dashboard</PageTitle>
+
+@if (isCheckingApi)
+{
+    <div class="text-center mt-5">
+        <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        <h4 class="mt-3">Connecting to API...</h4>
+    </div>
+}
+else if (!isApiAvailable)
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <h4 class="alert-heading">⚠️ API Connection Failed!</h4>
+        <p><strong>@apiErrorMessage</strong></p>
+        <hr>
+        <p class="mb-0">
+            <strong>Quick Fix:</strong> Open terminal and run:
+            <code style="background: #fff; padding: 2px 8px; border-radius: 3px;">cd HealthTech.API && dotnet watch</code>
+        </p>
+        <button type="button" class="btn btn-warning mt-3" @onclick="RetryApiConnection">
+            🔄 Retry Connection
+        </button>
+        <button type="button" class="btn btn-secondary mt-3 ms-2" @onclick="ViewDetailedInstructions">
+            📖 View Instructions
+        </button>
+    </div>
+}
+
+@if (isApiAvailable)
+{
+<div class="text-center mb-5">
+    <h1 class="display-4 text-primary">Welcome to MedEase</h1>
+    <p class="lead">Smart Appointment & Patient Record System</p>
+    <hr class="my-4">
+    <p>Select a module below to access specific clinic functions.</p>
+</div>
+
+<div class="row">
+    <div class="col-md-4 mb-4">
+        <div class="card h-100 shadow-sm border-primary">
+            <div class="card-header bg-primary text-white">
+                <i class="bi bi-calendar-check"></i> Patient Services
+            </div>
+            <div class="card-body">
+                <h5 class="card-title">Book Appointment</h5>
+                <p class="card-text">Schedule new consultations efficiently.</p>
+                <ul class="small text-muted">
+                    <li>Creates Appointments (<strong>Factory</strong>)</li>
+                    <li>Saves to DB (<strong>Singleton</strong>)</li>
+                    <li>Sends Email Alerts (<strong>Observer</strong>)</li>
+                </ul>
+            </div>
+            <div class="card-footer bg-transparent border-top-0">
+                <a href="book-appointment" class="btn btn-primary w-100">Go to Booking</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4 mb-4">
+        <div class="card h-100 shadow-sm border-success">
+            <div class="card-header bg-success text-white">
+                <i class="bi bi-folder2-open"></i> Medical Records
+            </div>
+            <div class="card-body">
+                <h5 class="card-title">Patient History</h5>
+                <p class="card-text">View and manage hierarchical patient files.</p>
+                <ul class="small text-muted">
+                    <li>Recursive Folder Structure</li>
+                    <li>Treats Files & Folders Uniformly</li>
+                    <li>Pattern: <strong>Composite</strong></li>
+                </ul>
+            </div>
+            <div class="card-footer bg-transparent border-top-0">
+                <a href="patient-records" class="btn btn-success w-100">View Records</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4 mb-4">
+        <div class="card h-100 shadow-sm border-info">
+            <div class="card-header bg-info text-white">
+                <i class="bi bi-bar-chart-line"></i> Doctor's Portal
+            </div>
+            <div class="card-body">
+                <h5 class="card-title">Reports & Analytics</h5>
+                <p class="card-text">Generate daily operational reports.</p>
+                <ul class="small text-muted">
+                    <li>Export to PDF or CSV</li>
+                    <li>Swaps Algorithms at Runtime</li>
+                    <li>Pattern: <strong>Strategy</strong></li>
+                </ul>
+            </div>
+            <div class="card-footer bg-transparent border-top-0">
+                <a href="doctor-dashboard" class="btn btn-info w-100 text-white">Generate Reports</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="alert alert-secondary mt-5" role="alert">
+    <h4 class="alert-heading">Technical Overview</h4>
+    <p>This system demonstrates the following Software Design Patterns:</p>
+    <hr>
+    <div class="row">
+        <div class="col-sm-6">
+            <strong>1. Singleton:</strong> Database Connection Manager<br>
+            <strong>2. Factory:</strong> Appointment Object Creation
+        </div>
+        <div class="col-sm-6">
+            <strong>3. Observer:</strong> Notification System<br>
+            <strong>4. Composite:</strong> Patient Record Hierarchy<br>
+            <strong>5. Strategy:</strong> Report Export Formats
+        </div>
+    </div>
+</div>}
+
+@code {
+    private bool isCheckingApi = true;
+    private bool isApiAvailable = false;
+    private string apiErrorMessage = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CheckApiConnection();
+    }
+
+    private async Task CheckApiConnection()
+    {
+        isCheckingApi = true;
+        StateHasChanged();
+
+        isApiAvailable = await ApiService.IsApiAvailableAsync();
+        
+        if (!isApiAvailable)
+        {
+            apiErrorMessage = ApiService.LastError ?? "Cannot connect to HealthTech.API";
+        }
+
+        isCheckingApi = false;
+    }
+
+    private async Task RetryApiConnection()
+    {
+        await CheckApiConnection();
+    }
+
+    private void ViewDetailedInstructions()
+    {
+        Navigation.NavigateTo("/api-check");
+    }
+}

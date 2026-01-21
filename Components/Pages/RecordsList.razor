@@ -1,0 +1,339 @@
+@page "/records-list"
+@rendermode InteractiveServer
+@using HealthTech.Services
+@inject ApiService ApiService
+
+<PageTitle>Medical Records List</PageTitle>
+
+<div class="container mt-4">
+    <h1>📋 Medical Records Directory</h1>
+    <p>Browse and search patient medical records alphabetically</p>
+
+    <!-- Search Bar -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-8">
+                    <div class="input-group">
+                        <span class="input-group-text">🔍</span>
+                        <input type="text" 
+                               class="form-control form-control-lg" 
+                               placeholder="Search by title or details..." 
+                               @bind="searchQuery"
+                               @bind:event="oninput"
+                               @onkeyup="FilterRecords" />
+                        @if (!string.IsNullOrEmpty(searchQuery))
+                        {
+                            <button class="btn btn-outline-secondary" @onclick="ClearSearch">✖ Clear</button>
+                        }
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <select class="form-select form-select-lg" @bind="selectedPatientId" @bind:after="LoadRecords">
+                        <option value="0">All Patients</option>
+                        @foreach (var patient in patients)
+                        {
+                            <option value="@patient.UserID">@patient.Name</option>
+                        }
+                    </select>
+                </div>
+            </div>
+            @if (!string.IsNullOrEmpty(searchQuery))
+            {
+                <div class="mt-2">
+                    <small class="text-muted">Found @filteredRecords.Count records matching "@searchQuery"</small>
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- Alphabet Navigation -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="d-flex flex-wrap gap-2">
+                @foreach (var letter in "ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+                {
+                    var count = GetRecordCountByLetter(letter);
+                    if (count > 0)
+                    {
+                        <button class="btn btn-sm @(selectedLetter == letter ? "btn-primary" : "btn-outline-primary")" 
+                                @onclick="() => FilterByLetter(letter)">
+                            @letter (@count)
+                        </button>
+                    }
+                    else
+                    {
+                        <button class="btn btn-sm btn-outline-secondary" disabled>@letter</button>
+                    }
+                }
+                <button class="btn btn-sm @(selectedLetter == null ? "btn-success" : "btn-outline-success")" 
+                        @onclick="ShowAll">
+                    Show All
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Records Display -->
+    @if (isLoading)
+    {
+        <div class="text-center py-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2">Loading records...</p>
+        </div>
+    }
+    else if (filteredRecords.Count == 0)
+    {
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle"></i> No records found. @(string.IsNullOrEmpty(searchQuery) ? "Try selecting a different patient." : "Try a different search term.")
+        </div>
+    }
+    else
+    {
+        <!-- Grouped by First Letter -->
+        @foreach (var group in GetGroupedRecords())
+        {
+            <div class="card mb-3">
+                <div class="card-header bg-primary text-white">
+                    <h3 class="mb-0">@group.Key</h3>
+                </div>
+                <div class="list-group list-group-flush">
+                    @foreach (var record in group.Value)
+                    {
+                        <div class="list-group-item list-group-item-action">
+                            <div class="d-flex w-100 justify-content-between align-items-start">
+                                <div class="flex-grow-1">
+                                    <div class="d-flex align-items-center mb-2">
+                                        @if (record.RecordType == "Folder")
+                                        {
+                                            <span class="badge bg-warning text-dark me-2">📂 Folder</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-info me-2">📄 File</span>
+                                        }
+                                        <h5 class="mb-0">@record.Title</h5>
+                                    </div>
+                                    
+                                    @if (!string.IsNullOrEmpty(record.Details))
+                                    {
+                                        <p class="mb-2 text-muted">@record.Details</p>
+                                    }
+                                    
+                                    <div class="d-flex gap-3">
+                                        <small class="text-muted">
+                                            <strong>Patient ID:</strong> @record.PatientID
+                                        </small>
+                                        <small class="text-muted">
+                                            <strong>Record ID:</strong> @record.RecordID
+                                        </small>
+                                        @if (record.ParentFolderID.HasValue)
+                                        {
+                                            <small class="text-muted">
+                                                <strong>Parent:</strong> @record.ParentFolderID
+                                            </small>
+                                        }
+                                    </div>
+                                </div>
+                                <div class="ms-3">
+                                    <button class="btn btn-sm btn-outline-primary" @onclick="() => ViewDetails(record)">
+                                        View
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+    }
+
+    <!-- Statistics -->
+    <div class="card mt-4">
+        <div class="card-body">
+            <div class="row text-center">
+                <div class="col-md-3">
+                    <h4>@allRecords.Count</h4>
+                    <small class="text-muted">Total Records</small>
+                </div>
+                <div class="col-md-3">
+                    <h4>@allRecords.Count(r => r.RecordType == "Folder")</h4>
+                    <small class="text-muted">Folders</small>
+                </div>
+                <div class="col-md-3">
+                    <h4>@allRecords.Count(r => r.RecordType == "File")</h4>
+                    <small class="text-muted">Files</small>
+                </div>
+                <div class="col-md-3">
+                    <h4>@filteredRecords.Count</h4>
+                    <small class="text-muted">Displayed</small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- View Details Modal -->
+@if (selectedRecord != null)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        @(selectedRecord.RecordType == "Folder" ? "📂" : "📄") @selectedRecord.Title
+                    </h5>
+                    <button type="button" class="btn-close" @onclick="CloseDetails"></button>
+                </div>
+                <div class="modal-body">
+                    <dl class="row">
+                        <dt class="col-sm-4">Record ID:</dt>
+                        <dd class="col-sm-8">@selectedRecord.RecordID</dd>
+
+                        <dt class="col-sm-4">Patient ID:</dt>
+                        <dd class="col-sm-8">@selectedRecord.PatientID</dd>
+
+                        <dt class="col-sm-4">Type:</dt>
+                        <dd class="col-sm-8">
+                            <span class="badge @(selectedRecord.RecordType == "Folder" ? "bg-warning text-dark" : "bg-info")">
+                                @selectedRecord.RecordType
+                            </span>
+                        </dd>
+
+                        <dt class="col-sm-4">Title:</dt>
+                        <dd class="col-sm-8">@selectedRecord.Title</dd>
+
+                        @if (selectedRecord.ParentFolderID.HasValue)
+                        {
+                            <dt class="col-sm-4">Parent Folder:</dt>
+                            <dd class="col-sm-8">@selectedRecord.ParentFolderID</dd>
+                        }
+
+                        @if (!string.IsNullOrEmpty(selectedRecord.Details))
+                        {
+                            <dt class="col-sm-4">Details:</dt>
+                            <dd class="col-sm-8">@selectedRecord.Details</dd>
+                        }
+                    </dl>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CloseDetails">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<RecordModel> allRecords = new List<RecordModel>();
+    private List<RecordModel> filteredRecords = new List<RecordModel>();
+    private List<User> patients = new List<User>();
+    
+    private string searchQuery = "";
+    private char? selectedLetter = null;
+    private int selectedPatientId = 0;
+    private bool isLoading = true;
+    private RecordModel? selectedRecord = null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadPatients();
+        await LoadRecords();
+    }
+
+    private async Task LoadPatients()
+    {
+        patients = await ApiService.GetUsersByRoleAsync("Patient");
+    }
+
+    private async Task LoadRecords()
+    {
+        isLoading = true;
+        
+        if (selectedPatientId > 0)
+        {
+            allRecords = await ApiService.GetRecordsByPatientAsync(selectedPatientId);
+        }
+        else
+        {
+            // Load all records for all patients
+            allRecords = new List<RecordModel>();
+            foreach (var patient in patients)
+            {
+                var records = await ApiService.GetRecordsByPatientAsync(patient.UserID);
+                allRecords.AddRange(records);
+            }
+        }
+
+        filteredRecords = allRecords.OrderBy(r => r.Title).ToList();
+        isLoading = false;
+    }
+
+    private void FilterRecords()
+    {
+        if (string.IsNullOrWhiteSpace(searchQuery))
+        {
+            filteredRecords = allRecords.OrderBy(r => r.Title).ToList();
+        }
+        else
+        {
+            var query = searchQuery.ToLower();
+            filteredRecords = allRecords
+                .Where(r => r.Title.ToLower().Contains(query) || 
+                           (r.Details != null && r.Details.ToLower().Contains(query)))
+                .OrderBy(r => r.Title)
+                .ToList();
+        }
+
+        // Apply letter filter if one is selected
+        if (selectedLetter.HasValue)
+        {
+            filteredRecords = filteredRecords
+                .Where(r => r.Title.ToUpper().StartsWith(selectedLetter.Value))
+                .ToList();
+        }
+    }
+
+    private void FilterByLetter(char letter)
+    {
+        selectedLetter = letter;
+        FilterRecords();
+    }
+
+    private void ShowAll()
+    {
+        selectedLetter = null;
+        FilterRecords();
+    }
+
+    private void ClearSearch()
+    {
+        searchQuery = "";
+        FilterRecords();
+    }
+
+    private int GetRecordCountByLetter(char letter)
+    {
+        return allRecords.Count(r => r.Title.ToUpper().StartsWith(letter));
+    }
+
+    private Dictionary<char, List<RecordModel>> GetGroupedRecords()
+    {
+        return filteredRecords
+            .GroupBy(r => char.ToUpper(r.Title[0]))
+            .OrderBy(g => g.Key)
+            .ToDictionary(g => g.Key, g => g.ToList());
+    }
+
+    private void ViewDetails(RecordModel record)
+    {
+        selectedRecord = record;
+    }
+
+    private void CloseDetails()
+    {
+        selectedRecord = null;
+    }
+}

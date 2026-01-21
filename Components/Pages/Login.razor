@@ -1,0 +1,125 @@
+@page "/login"
+@rendermode InteractiveServer
+@using HealthTech.Services
+@inject UserSession Session
+@inject NavigationManager Nav
+@inject ApiService ApiService
+
+<PageTitle>Login</PageTitle>
+
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white text-center">
+                    <h3>MedEase Login</h3>
+                </div>
+                <div class="card-body">
+                    
+                    <div class="d-flex justify-content-center mb-4">
+                        <button class="btn @(isLoginMode ? "btn-primary" : "btn-outline-primary") me-2" 
+                                @onclick="() => isLoginMode = true">Login</button>
+                        <button class="btn @(!isLoginMode ? "btn-success" : "btn-outline-success")" 
+                                @onclick="() => isLoginMode = false">Register New User</button>
+                    </div>
+
+                    @if (isLoginMode)
+                    {
+                        <div class="mb-3">
+                            <label>Username:</label>
+                            <input class="form-control" @bind="username" placeholder="Enter username" />
+                        </div>
+                        <div class="mb-3">
+                            <label>Password:</label>
+                            <input type="password" class="form-control" @bind="password" placeholder="Enter password" />
+                        </div>
+                        <button class="btn btn-primary w-100" @onclick="DoLogin">Login</button>
+                    }
+                    else
+                    {
+                        <div class="mb-3">
+                            <label>New Username:</label>
+                            <input class="form-control" @bind="regName" />
+                        </div>
+                        <div class="mb-3">
+                            <label>Select Role:</label>
+                            <select class="form-control" @bind="regRole">
+                                <option value="Patient">Patient</option>
+                                <option value="Doctor">Doctor</option>
+                                <option value="Receptionist">Receptionist</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label>New Password:</label>
+                            <input type="password" class="form-control" @bind="regPass" />
+                        </div>
+                        <button class="btn btn-success w-100" @onclick="DoRegister">Create Account</button>
+                    }
+
+                    <p class="text-center mt-3 text-danger">@message</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    bool isLoginMode = true;
+    string username = "";
+    string password = "";
+    string message = "";
+
+    // Register vars
+    string regName = "";
+    string regPass = "";
+    string regRole = "Patient";
+
+    private async Task DoLogin()
+    {
+        try
+        {
+            var user = await ApiService.LoginByNameAsync(username, password);
+            if (user != null)
+            {
+                Session.Login(user);
+                Nav.NavigateTo("/"); // Go to Home Page
+            }
+            else
+            {
+                message = "Invalid Username or Password!";
+            }
+        }
+        catch (Exception ex)
+        {
+            if (ex.Message.Contains("API Connection") || ex.Message.Contains("API Timeout"))
+            {
+                message = "⚠️ Cannot connect to server. Please make sure HealthTech.API is running!";
+            }
+            else
+            {
+                message = "Error: " + ex.Message;
+            }
+        }
+    }
+
+    private async Task DoRegister()
+    {
+        try
+        {
+            await ApiService.RegisterUserAsync(regName, regPass, regRole);
+            message = "Success! Please switch to Login.";
+            isLoginMode = true; // Switch back to login tab
+        }
+        catch (Exception ex)
+        {
+            if (ex.Message.Contains("API Connection") || ex.Message.Contains("API Timeout"))
+            {
+                message = "⚠️ Cannot connect to server. Please make sure HealthTech.API is running!";
+            }
+            else
+            {
+                message = "Error: " + ex.Message;
+            }
+        }
+    }
+}

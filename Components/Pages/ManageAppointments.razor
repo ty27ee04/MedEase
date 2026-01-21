@@ -1,0 +1,126 @@
+@page "/manage-appointments"
+@rendermode InteractiveServer
+@using HealthTech.Services
+@inject ApiService ApiService
+
+<PageTitle>Manage Appointments</PageTitle>
+
+<h1>Appointment Management (CRUD)</h1>
+
+@if (isEditing)
+{
+    <div class="card p-4 mb-4 border-warning">
+        <h4>Edit Appointment (ID: @editingModel.AppointmentID)</h4>
+        
+        <div class="mb-2">
+            <label>Patient (Read Only):</label>
+            <input class="form-control" value="@editingModel.PatientName" disabled />
+        </div>
+
+        <div class="mb-2">
+            <label>Status:</label>
+            <select class="form-control" @bind="editingModel.Status">
+                <option>Confirmed</option>
+                <option>Pending</option>
+                <option>Cancelled</option>
+                <option>Completed</option>
+            </select>
+        </div>
+        <button class="btn btn-success" @onclick="SaveEdit">Save Changes</button>
+        <button class="btn btn-secondary" @onclick="CancelEdit">Cancel</button>
+    </div>
+}
+
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Patient</th>
+            <th>Doctor</th>
+            <th>Type</th>
+            <th>Date</th>
+            <th>Status</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var appt in appointments)
+        {
+            <tr>
+                <td>@appt.AppointmentID</td>
+                <td>@appt.PatientName</td>
+                <td>@appt.DoctorName</td>
+                <td>@appt.Type</td>
+                <td>@appt.DateTime.ToShortDateString()</td>
+                <td>
+                    <span class="badge @GetBadgeClass(appt.Status)">
+                        @appt.Status
+                    </span>
+                </td>
+                <td>
+                    <button class="btn btn-sm btn-warning" @onclick="() => EditAppt(appt)">Edit</button>
+                    <button class="btn btn-sm btn-danger" @onclick="() => DeleteAppt(appt.AppointmentID)">Delete</button>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@code {
+    private List<AppointmentModel> appointments = new List<AppointmentModel>();
+    
+    // For Editing
+    private bool isEditing = false;
+    private AppointmentModel editingModel = new AppointmentModel();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        appointments = await ApiService.GetAllAppointmentsAsync();
+    }
+
+    private async Task DeleteAppt(int id)
+    {
+        await ApiService.DeleteAppointmentAsync(id);
+        await LoadData(); 
+    }
+
+    private void EditAppt(AppointmentModel appt)
+    {
+        // Clone the object to avoid live-editing the table
+        editingModel = new AppointmentModel
+        {
+            AppointmentID = appt.AppointmentID,
+            PatientName = appt.PatientName, // Just for display in edit form
+            Status = appt.Status
+        };
+        isEditing = true;
+    }
+
+    private async Task SaveEdit()
+    {
+        await ApiService.UpdateAppointmentAsync(editingModel);
+        isEditing = false;
+        await LoadData(); 
+    }
+
+    private void CancelEdit()
+    {
+        isEditing = false;
+    }
+
+    private string GetBadgeClass(string status)
+    {
+        return status switch
+        {
+            "Confirmed" => "bg-success",
+            "Pending" => "bg-primary",
+            "Cancelled" => "bg-danger",
+            _ => "bg-secondary"
+        };
+    }
+}
