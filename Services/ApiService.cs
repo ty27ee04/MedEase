@@ -422,13 +422,26 @@ namespace HealthTech.Services
             try
             {
                 var response = await _httpClient.PostAsJsonAsync($"{_baseUrl}/patientrecords", record);
-                response.EnsureSuccessStatusCode();
+                
+                if (!response.IsSuccessStatusCode)
+                {
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    LastError = $"Failed to save record: {response.StatusCode} - {errorContent}";
+                    throw new Exception(LastError);
+                }
+                
                 var result = await response.Content.ReadFromJsonAsync<CreateResponse>();
                 return result?.Id ?? 0;
             }
-            catch
+            catch (HttpRequestException ex)
             {
-                return 0;
+                LastError = $"Cannot connect to API: {ex.Message}";
+                throw new Exception(LastError, ex);
+            }
+            catch (Exception ex)
+            {
+                LastError = $"Error saving record: {ex.Message}";
+                throw;
             }
         }
 
