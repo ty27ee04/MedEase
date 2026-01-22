@@ -447,3 +447,25 @@ COMMIT;
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
+<<<<<<< HEAD
+
+SELECT 
+    u.name AS Patient,
+    a.type AS AppointmentType,
+    a.status AS Status,
+    a.dateTime AS VisitDate
+FROM appointment a
+JOIN user u ON a.patientID = u.userID
+WHERE u.userID = @id;
+
+SELECT 
+    a.appointmentID,
+    u.name AS Patient,
+    a.type,
+    a.status,
+    a.dateTime
+FROM appointment a
+JOIN user u ON a.patientID = u.userID
+WHERE a.dateTime BETWEEN @start AND @end;
+=======
+>>>>>>> 422f23b6b42e05d1657dada3ee19136d19b15070

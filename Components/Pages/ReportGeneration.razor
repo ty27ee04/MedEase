@@ -1,0 +1,128 @@
+@page "/reports"
+@using System.Data
+@using HealthTech.Services
+@rendermode InteractiveServer
+
+<h3>Report Generation</h3>
+
+<div class="card p-3">
+
+    <label>Report Type:</label>
+    <select @bind="selectedReportType" class="form-control">
+        <option value="">-- Select --</option>
+        <option value="Medical">Medical Report</option>
+        <option value="Operation">Operation Report</option>
+    </select>
+
+    <br />
+
+    <label>Export Format:</label>
+    <select @bind="selectedFormat" class="form-control">
+        <option value="">-- Select --</option>
+        <option value="PDF">PDF</option>
+        <option value="CSV">CSV</option>
+        <option value="JSON">JSON</option>
+    </select>
+
+    <br />
+
+    @if (selectedReportType == "Medical")
+    {
+        <label>Patient ID:</label>
+        <input type="number" class="form-control" @bind="patientId" />
+    }
+
+    @if (selectedReportType == "Operation")
+    {
+        <label>Start Date:</label>
+        <input type="date" class="form-control" @bind="startDate" />
+        <label>End Date:</label>
+        <input type="date" class="form-control" @bind="endDate" />
+    }
+
+    <br />
+
+    <button class="btn btn-primary" @onclick="GenerateReport">
+        Generate Report
+    </button>
+
+    <br /><br />
+
+    <h5>Preview</h5>
+    @if (string.IsNullOrEmpty(reportOutput))
+    {
+        <p class="text-muted">No report generated yet.</p>
+    }
+    else
+    {
+        <div class="bg-light p-4 rounded">
+            @((MarkupString)reportOutput)
+        </div>
+    }
+
+</div>
+
+@code {
+    string selectedReportType = "";
+    string selectedFormat = "";
+    string reportOutput = "";
+
+    int patientId;
+    DateTime startDate = DateTime.Now.AddDays(-7);
+    DateTime endDate = DateTime.Now;
+    void GenerateReport()
+{
+    var context = new ReportContext();
+
+    if (selectedReportType == "Medical")
+        context.SetReportType(new MedicalReportStrategy());
+    else
+        context.SetReportType(new OperationReportStrategy());
+
+    if (selectedFormat == "CSV")
+        context.SetExportType(new CsvExportStrategy());
+    else if (selectedFormat == "JSON")
+        context.SetExportType(new JsonExportStrategy());
+    else
+        context.SetExportType(new HtmlPreviewStrategy());  // Preview
+
+    object requestData = selectedReportType == "Medical"
+        ? patientId
+        : Tuple.Create(startDate, endDate);
+
+    reportOutput = context.Generate(requestData);
+}
+
+    string ConvertTableToText(DataTable table)
+    {
+        if (table.Rows.Count == 0)
+            return "<p><strong>No records found.</strong></p>";
+
+        string html = "<table class='table table-bordered table-striped'>";
+        html += "<thead class='table-dark'><tr>";
+
+        foreach (DataColumn col in table.Columns)
+        {
+            string niceName = col.ColumnName
+                .Replace("FullName", "Name")
+                .Replace("VisitDate", "Visit Date")
+                .Replace("OperationDate", "Operation Date");
+
+            html += $"<th>{niceName}</th>";
+        }
+
+        html += "</tr></thead><tbody>";
+
+        foreach (DataRow row in table.Rows)
+        {
+            html += "<tr>";
+            foreach (var item in row.ItemArray)
+                html += $"<td>{item}</td>";
+            html += "</tr>";
+        }
+
+        html += "</tbody></table>";
+
+        return html;
+    }
+}
