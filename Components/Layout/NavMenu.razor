@@ -1,4 +1,7 @@
-﻿<div class="top-row ps-3 navbar navbar-dark">
+﻿@rendermode InteractiveServer
+@using HealthTech.Services
+
+<div class="top-row ps-3 navbar navbar-dark">
     <div class="container-fluid">
         <a class="navbar-brand" href="">HealthTech</a>
     </div>
@@ -25,11 +28,6 @@
         </NavLink>
     </div>
     <div class="nav-item px-3">
-    <NavLink class="nav-link" href="manage-appointments">
-            <span class="bi bi-table" aria-hidden="true"></span> Manage CRUD
-        </NavLink>
-    </div>
-    <div class="nav-item px-3">
         <NavLink class="nav-link" href="patient-records">
             <span class="bi bi-folder-fill-nav-menu" aria-hidden="true"></span> Patient Records
         </NavLink>
@@ -47,15 +45,10 @@
         </NavLink>
     </div>
     <div class="nav-item px-3">
-<<<<<<< HEAD
         <NavLink class="nav-link" href="reports">
-=======
-        <NavLink class="nav-link" href="doctor-dashboard">
->>>>>>> 422f23b6b42e05d1657dada3ee19136d19b15070
             <span class="bi bi-bar-chart-fill-nav-menu" aria-hidden="true"></span> Reports
         </NavLink>
     </div>
     
     </nav>
 </div>
-

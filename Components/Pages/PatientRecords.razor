@@ -157,14 +157,27 @@
                                         <div class="list-group-item @(editingRecordId == record.RecordID ? "border-primary" : "") @(selectedRecordId == record.RecordID ? "border-success border-2" : "") clickable-record" 
                                              @onclick="() => HandleRecordClick(record)"
                                              style="cursor: pointer;">
-                                                <div class="d-flex justify-content-between align-items-start">
-                                                    <div class="flex-grow-1">
+                                            <div class="d-flex justify-content-between align-items-start">
+                                                <div class="flex-grow-1">
                                                         @if (editingRecordId == record.RecordID)
                                                         {
                                                             <!-- Edit Mode -->
                                                             <div class="mb-2" @onclick:stopPropagation="true">
                                                                 <input class="form-control mb-2" @bind="editingTitle" placeholder="Title" />
                                                                 <textarea class="form-control mb-2" @bind="editingDetails" rows="3" placeholder="Details"></textarea>
+                                                                @if (availableFolders.Count > 0)
+                                                                {
+                                                                    <select class="form-control" @bind="editingFolderIdString">
+                                                                        <option value="">-- Not in any folder --</option>
+                                                                        @foreach (var folder in GetEditableParentFolders(record.RecordID))
+                                                                        {
+                                                                            <option value="@folder.RecordID">
+                                                                                📂 @(!string.IsNullOrEmpty(folder.FolderName) ? folder.FolderName : folder.Title)
+                                                                            </option>
+                                                                        }
+                                                                    </select>
+                                                                    <small class="text-muted d-block">Change folder location</small>
+                                                                }
                                                             </div>
                                                         }
                                                         else
@@ -196,8 +209,8 @@
                                                                     ID: @record.RecordID 
                                                                     @if (record.RecordType == "Folder")
                                                                     {
-                                                                        var filesCount = allRecords.Count(r => r.InFolder == record.RecordID);
-                                                                        <span class="badge bg-secondary ms-2">@filesCount file(s)</span>
+                                                                        var childCount = GetChildCount(record.RecordID);
+                                                                        <span class="badge bg-secondary ms-2">@childCount file(s)</span>
                                                                     }
                                                                     @if (record.InFolder.HasValue)
                                                                     {
@@ -213,27 +226,26 @@
                                                                 </div>
                                                             </div>
                                                         }
-                                                    </div>
-                                                    <div class="ms-2" @onclick:stopPropagation="true">
-                                                        @if (editingRecordId == record.RecordID)
-                                                        {
-                                                            <button class="btn btn-sm btn-success me-1" @onclick="SaveEdit">💾 Save</button>
-                                                            <button class="btn btn-sm btn-secondary" @onclick="CancelEdit">✖ Cancel</button>
-                                                        }
-                                                        else
-                                                        {
-                                                            <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => StartEdit(record)">✏️ Edit</button>
-                                                            <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteRecord(record.RecordID)">🗑️</button>
-                                                        }
-                                                    </div>
-                                                </div>
+                                            </div>
+                                            <div class="ms-2" @onclick:stopPropagation="true">
+                                                @if (editingRecordId == record.RecordID)
+                                                {
+                                                    <button class="btn btn-sm btn-success me-1" @onclick="SaveEdit">💾 Save</button>
+                                                    <button class="btn btn-sm btn-secondary" @onclick="CancelEdit">✖ Cancel</button>
+                                                }
+                                                else
+                                                {
+                                                    <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => StartEdit(record)">✏️ Edit</button>
+                                                    <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteRecord(record.RecordID)">🗑️</button>
+                                                }
                                             </div>
                                         </div>
+                                    </div>
 
-                                        @* If it's a folder and expanded, show its files directly below *@
+                                    @* If it's a folder and expanded, show its files directly below *@
                                         @if (record.RecordType == "Folder" && expandedFolders.Contains(record.RecordID))
                                         {
-                                            @foreach (var childFile in filteredRecords.Where(r => r.InFolder == record.RecordID).OrderByDescending(r => r.CreatedAt))
+                                            @foreach (var childFile in allRecords.Where(r => r.InFolder == record.RecordID).OrderByDescending(r => r.CreatedAt))
                                             {
                                                 <div class="list-group-item @(editingRecordId == childFile.RecordID ? "border-primary" : "") @(selectedRecordId == childFile.RecordID ? "border-success border-2" : "") clickable-record" 
                                                      @onclick="() => HandleRecordClick(childFile)"
@@ -246,13 +258,39 @@
                                                                 <div class="mb-2" @onclick:stopPropagation="true">
                                                                     <input class="form-control mb-2" @bind="editingTitle" placeholder="Title" />
                                                                     <textarea class="form-control mb-2" @bind="editingDetails" rows="3" placeholder="Details"></textarea>
+                                                                    @if (availableFolders.Count > 0)
+                                                                    {
+                                                                        <select class="form-control" @bind="editingFolderIdString">
+                                                                            <option value="">-- Not in any folder --</option>
+                                                                            @foreach (var folder in GetEditableParentFolders(childFile.RecordID))
+                                                                            {
+                                                                                <option value="@folder.RecordID">
+                                                                                    📂 @(!string.IsNullOrEmpty(folder.FolderName) ? folder.FolderName : folder.Title)
+                                                                                </option>
+                                                                            }
+                                                                        </select>
+                                                                        <small class="text-muted d-block">Change folder location</small>
+                                                                    }
                                                                 </div>
                                                             }
                                                             else
                                                             {
                                                                 <!-- View Mode -->
                                                                 <div class="d-flex align-items-center mb-1">
-                                                                    <span class="badge bg-info me-2">File</span>
+                                                                    @if (childFile.RecordType == "Folder")
+                                                                    {
+                                                                        <span class="me-2">
+                                                                            @(expandedFolders.Contains(childFile.RecordID) ? "📂" : "📁")
+                                                                        </span>
+                                                                    }
+                                                                    <span class="badge @(childFile.RecordType == "Folder" ? "bg-warning text-dark" : "bg-info") me-2">
+                                                                        @(childFile.RecordType == "Folder" ? "Folder" : "File")
+                                                                    </span>
+                                                                    @if (childFile.RecordType == "Folder" && !string.IsNullOrEmpty(childFile.FolderName))
+                                                                    {
+                                                                        <h6 class="mb-0 text-primary fw-bold">@childFile.FolderName</h6>
+                                                                        <span class="mx-2 text-muted">|</span>
+                                                                    }
                                                                     <h6 class="mb-0">@childFile.Title</h6>
                                                                 </div>
                                                                 @if (!string.IsNullOrEmpty(childFile.Details))
@@ -261,7 +299,16 @@
                                                                 }
                                                                 <div class="d-flex justify-content-between align-items-center">
                                                                     <small class="text-muted">
-                                                                        ID: @childFile.RecordID | In Folder: @childFile.InFolder
+                                                                        ID: @childFile.RecordID
+                                                                        @if (childFile.RecordType == "Folder")
+                                                                        {
+                                                                            var childCount = GetChildCount(childFile.RecordID);
+                                                                            <span class="badge bg-secondary ms-2">@childCount file(s)</span>
+                                                                        }
+                                                                        @if (childFile.InFolder.HasValue)
+                                                                        {
+                                                                            <text>| In Folder: @childFile.InFolder</text>
+                                                                        }
                                                                     </small>
                                                                     <div class="text-end">
                                                                         <small class="text-muted d-block">Created: @childFile.CreatedAt.ToString("MMM dd, yyyy HH:mm")</small>
@@ -287,6 +334,101 @@
                                                         </div>
                                                     </div>
                                                 </div>
+                                                
+                                                @* If this child is also a folder and expanded, show ITS children (recursive nesting) *@
+                                                @if (childFile.RecordType == "Folder" && expandedFolders.Contains(childFile.RecordID))
+                                                {
+                                                    @foreach (var nestedChild in allRecords.Where(r => r.InFolder == childFile.RecordID).OrderByDescending(r => r.CreatedAt))
+                                                    {
+                                                        <div class="list-group-item @(editingRecordId == nestedChild.RecordID ? "border-primary" : "") @(selectedRecordId == nestedChild.RecordID ? "border-success border-2" : "") clickable-record" 
+                                                             @onclick="() => HandleRecordClick(nestedChild)"
+                                                             style="cursor: pointer; margin-left: 60px; border-left: 3px solid #17a2b8;">
+                                                            <div class="d-flex justify-content-between align-items-start">
+                                                                <div class="flex-grow-1">
+                                                                    @if (editingRecordId == nestedChild.RecordID)
+                                                                    {
+                                                                        <!-- Edit Mode -->
+                                                                        <div class="mb-2" @onclick:stopPropagation="true">
+                                                                            <input class="form-control mb-2" @bind="editingTitle" placeholder="Title" />
+                                                                            <textarea class="form-control mb-2" @bind="editingDetails" rows="3" placeholder="Details"></textarea>
+                                                                            @if (availableFolders.Count > 0)
+                                                                            {
+                                                                                <select class="form-control" @bind="editingFolderIdString">
+                                                                                    <option value="">-- Not in any folder --</option>
+                                                                                    @foreach (var folder in GetEditableParentFolders(nestedChild.RecordID))
+                                                                                    {
+                                                                                        <option value="@folder.RecordID">
+                                                                                            📂 @(!string.IsNullOrEmpty(folder.FolderName) ? folder.FolderName : folder.Title)
+                                                                                        </option>
+                                                                                    }
+                                                                                </select>
+                                                                                <small class="text-muted d-block">Change folder location</small>
+                                                                            }
+                                                                        </div>
+                                                                    }
+                                                                    else
+                                                                    {
+                                                                        <!-- View Mode -->
+                                                                        <div class="d-flex align-items-center mb-1">
+                                                                            @if (nestedChild.RecordType == "Folder")
+                                                                            {
+                                                                                <span class="me-2">
+                                                                                    @(expandedFolders.Contains(nestedChild.RecordID) ? "📂" : "📁")
+                                                                                </span>
+                                                                            }
+                                                                            <span class="badge @(nestedChild.RecordType == "Folder" ? "bg-warning text-dark" : "bg-info") me-2">
+                                                                                @(nestedChild.RecordType == "Folder" ? "Folder" : "File")
+                                                                            </span>
+                                                                            @if (nestedChild.RecordType == "Folder" && !string.IsNullOrEmpty(nestedChild.FolderName))
+                                                                            {
+                                                                                <h6 class="mb-0 text-primary fw-bold">@nestedChild.FolderName</h6>
+                                                                                <span class="mx-2 text-muted">|</span>
+                                                                            }
+                                                                            <h6 class="mb-0">@nestedChild.Title</h6>
+                                                                        </div>
+                                                                        @if (!string.IsNullOrEmpty(nestedChild.Details))
+                                                                        {
+                                                                            <p class="mb-1 text-muted small">@nestedChild.Details</p>
+                                                                        }
+                                                                        <div class="d-flex justify-content-between align-items-center">
+                                                                            <small class="text-muted">
+                                                                                ID: @nestedChild.RecordID
+                                                                                @if (nestedChild.RecordType == "Folder")
+                                                                                {
+                                                                                    var nestedCount = GetChildCount(nestedChild.RecordID);
+                                                                                    <span class="badge bg-secondary ms-2">@nestedCount file(s)</span>
+                                                                                }
+                                                                                @if (nestedChild.InFolder.HasValue)
+                                                                                {
+                                                                                    <text>| In Folder: @nestedChild.InFolder</text>
+                                                                                }
+                                                                            </small>
+                                                                            <div class="text-end">
+                                                                                <small class="text-muted d-block">Created: @nestedChild.CreatedAt.ToString("MMM dd, yyyy HH:mm")</small>
+                                                                                @if (Math.Abs((nestedChild.UpdatedAt - nestedChild.CreatedAt).TotalSeconds) > 1)
+                                                                                {
+                                                                                    <small class="text-warning d-block">Updated: @nestedChild.UpdatedAt.ToString("MMM dd, yyyy HH:mm")</small>
+                                                                                }
+                                                                            </div>
+                                                                        </div>
+                                                                    }
+                                                                </div>
+                                                                <div class="ms-2" @onclick:stopPropagation="true">
+                                                                    @if (editingRecordId == nestedChild.RecordID)
+                                                                    {
+                                                                        <button class="btn btn-sm btn-success me-1" @onclick="SaveEdit">💾 Save</button>
+                                                                        <button class="btn btn-sm btn-secondary" @onclick="CancelEdit">✖ Cancel</button>
+                                                                    }
+                                                                    else
+                                                                    {
+                                                                        <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => StartEdit(nestedChild)">✏️ Edit</button>
+                                                                        <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteRecord(nestedChild.RecordID)">🗑️</button>
+                                                                    }
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    }
+                                                }
                                             }
                                         }
                                     }
@@ -325,20 +467,29 @@
                             <textarea class="form-control" @bind="newRecordDetails" placeholder="Details..." rows="3"></textarea>
                         </div>
 
-                        @if (newRecordType == "File" && availableFolders.Count > 0)
+                        @if ((newRecordType == "File" || newRecordType == "Folder") && availableFolders.Count > 0)
                         {
                             <div class="mb-3">
-                                <label class="form-label fw-bold">Add to Existing Folder?</label>
-                                <select class="form-control" @bind="newRecordParentId">
-                                    <option value="">-- New Separate Case --</option>
+                                <label class="form-label fw-bold">@(newRecordType == "Folder" ? "Create Inside Folder?" : "Add to Existing Folder?")</label>
+                                <select class="form-control" @bind="newRecordParentIdString">
+                                    <option value="">-- @(newRecordType == "Folder" ? "Create at Root Level" : "New Separate Case") --</option>
                                     @foreach (var folder in availableFolders)
                                     {
                                         <option value="@folder.RecordID">
-                                            📂 @folder.FolderName (@folder.Title)
+                                            📂 @(!string.IsNullOrEmpty(folder.FolderName) ? folder.FolderName : folder.Title)
                                         </option>
                                     }
                                 </select>
-                                <small class="text-muted">Select a folder to add this case to an existing folder, or leave as separate case</small>
+                                <small class="text-muted">
+                                    @if (newRecordType == "Folder")
+                                    {
+                                        <text>You can nest folders inside other folders</text>
+                                    }
+                                    else
+                                    {
+                                        <text>Select a folder to add this case to an existing folder, or leave as separate case</text>
+                                    }
+                                </small>
                             </div>
                         }
 
@@ -424,11 +575,13 @@
     private string newRecordType = "File";
     private string newFolderName = "";
     private int? newRecordParentId = null;
+    private string newRecordParentIdString = "";
 
     // Editing
     private int editingRecordId = 0;
     private string editingTitle = "";
     private string editingDetails = "";
+    private string editingFolderIdString = "";
 
     protected override async Task OnInitializedAsync()
     {
@@ -504,11 +657,19 @@
 
         allRecords = await ApiService.GetRecordsByPatientAsync(selectedPatientId);
         
+        Console.WriteLine($"[UI] LoadRecords - Loaded {allRecords.Count} records for patient {selectedPatientId}");
+        foreach (var rec in allRecords.Take(3))
+        {
+            Console.WriteLine($"  - RecordID: {rec.RecordID}, Title: {rec.Title}, InFolder: {rec.InFolder}, FolderName: {rec.FolderName}");
+        }
+        
         // Load available folders for selection
         availableFolders = allRecords
             .Where(r => r.RecordType == "Folder")
             .OrderByDescending(r => r.CreatedAt)
             .ToList();
+        
+        Console.WriteLine($"[UI] Available folders: {availableFolders.Count}");
         
         // Apply filtering to update the displayed list
         FilterRecords();
@@ -623,17 +784,24 @@
 
         try
         {
+            // Parse the folder ID from string
+            int? parentFolderId = null;
+            if (!string.IsNullOrWhiteSpace(newRecordParentIdString) && int.TryParse(newRecordParentIdString, out int parsedId))
+            {
+                parentFolderId = parsedId;
+            }
+
             var newRecord = new RecordModel
             {
                 PatientID = selectedPatientId,
-                InFolder = newRecordParentId,
+                InFolder = parentFolderId,
                 RecordType = newRecordType,
                 Title = newRecordTitle,
                 Details = newRecordDetails,
                 FolderName = newRecordType == "Folder" ? newRecordTitle : "" // Use title as folder name
             };
 
-            Console.WriteLine($"DEBUG: Saving record - PatientID: {newRecord.PatientID}, Title: {newRecord.Title}, Type: {newRecord.RecordType}");
+            Console.WriteLine($"DEBUG: Saving record - PatientID: {newRecord.PatientID}, Title: {newRecord.Title}, Type: {newRecord.RecordType}, InFolder: {newRecord.InFolder}");
             
             await ApiService.SaveRecordAsync(newRecord);
             
@@ -660,6 +828,7 @@
             newRecordDetails = "";
             newFolderName = "";
             newRecordParentId = null;
+            newRecordParentIdString = "";
             newRecordType = "File";
             
             // Clear filters to show the new record
@@ -684,6 +853,8 @@
         editingRecordId = record.RecordID;
         editingTitle = record.Title;
         editingDetails = record.Details ?? "";
+        editingFolderIdString = record.InFolder.HasValue ? record.InFolder.Value.ToString() : "";
+        Console.WriteLine($"[UI] StartEdit - RecordID: {record.RecordID}, InFolder: {record.InFolder}, editingFolderIdString: '{editingFolderIdString}'");
     }
 
     private async Task SaveEdit()
@@ -700,17 +871,45 @@
             var record = allRecords.FirstOrDefault(r => r.RecordID == editingRecordId);
             if (record != null)
             {
+                Console.WriteLine($"[UI] Before update - RecordID: {record.RecordID}, Title: {record.Title}, Details: {record.Details}, InFolder: {record.InFolder}");
                 record.Title = editingTitle;
                 record.Details = editingDetails;
                 
-                await ApiService.UpdateRecordAsync(record);
+                // Parse and update folder location
+                if (!string.IsNullOrWhiteSpace(editingFolderIdString) && int.TryParse(editingFolderIdString, out int folderId))
+                {
+                    record.InFolder = folderId;
+                }
+                else
+                {
+                    record.InFolder = null;
+                }
                 
-                statusMessage = $"✅ Record updated successfully.";
-                isError = false;
-                editingRecordId = 0;
+                Console.WriteLine($"[UI] After local update - RecordID: {record.RecordID}, Title: {record.Title}, Details: {record.Details}, InFolder: {record.InFolder}");
                 
-                // Reload to reflect changes
-                await LoadRecords();
+                var result = await ApiService.UpdateRecordAsync(record);
+                Console.WriteLine($"[UI] API Update result: {result}");
+                
+                if (result)
+                {
+                    statusMessage = $"✅ Record updated successfully.";
+                    isError = false;
+                    editingRecordId = 0;
+                    
+                    // Reload to reflect changes
+                    await LoadRecords();
+                }
+                else
+                {
+                    statusMessage = $"❌ Failed to update record on server";
+                    isError = true;
+                }
+            }
+            else
+            {
+                Console.WriteLine($"[UI] ERROR: Could not find record with ID {editingRecordId}");
+                statusMessage = $"❌ Could not find record to update";
+                isError = true;
             }
         }
         catch (Exception ex)
@@ -752,5 +951,54 @@
     {
         // This is a placeholder - in production, use JSInterop for confirm dialog
         return true;
+    }
+
+    private int GetChildCount(int folderId)
+    {
+        // Count all records (files and folders) inside this folder
+        return allRecords.Count(r => r.InFolder == folderId);
+    }
+
+    private List<RecordModel> GetEditableParentFolders(int currentRecordId)
+    {
+        // When editing, prevent circular references
+        var currentRecord = allRecords.FirstOrDefault(r => r.RecordID == currentRecordId);
+        
+        if (currentRecord == null || currentRecord.RecordType != "Folder")
+        {
+            // If it's a file, can go into any folder except itself (which isn't a folder anyway)
+            return availableFolders.Where(f => f.RecordID != currentRecordId).ToList();
+        }
+        
+        // For folders, prevent circular references:
+        // 1. Can't put folder inside itself
+        // 2. Can't put folder inside its own descendants
+        var descendantIds = GetAllDescendants(currentRecordId);
+        descendantIds.Add(currentRecordId); // Add self to exclusion list
+        
+        return availableFolders.Where(f => !descendantIds.Contains(f.RecordID)).ToList();
+    }
+
+    private HashSet<int> GetAllDescendants(int folderId)
+    {
+        var descendants = new HashSet<int>();
+        var directChildren = allRecords.Where(r => r.InFolder == folderId).ToList();
+        
+        foreach (var child in directChildren)
+        {
+            descendants.Add(child.RecordID);
+            
+            // If this child is also a folder, get its descendants recursively
+            if (child.RecordType == "Folder")
+            {
+                var childDescendants = GetAllDescendants(child.RecordID);
+                foreach (var desc in childDescendants)
+                {
+                    descendants.Add(desc);
+                }
+            }
+        }
+        
+        return descendants;
     }
 }

@@ -1,0 +1,56 @@
+@rendermode InteractiveServer
+@using HealthTech.Services
+@inject UserSession Session
+@inject NavigationManager Nav
+@implements IDisposable
+
+<div class="d-flex align-items-center">
+    @if (Session.IsLoggedIn)
+    {
+        <div class="dropdown" style="position: relative;">
+            <button class="btn btn-outline-primary btn-sm dropdown-toggle" type="button" 
+                    @onclick="ToggleDropdown" style="white-space: nowrap;">
+                Welcome, @Session.UserName
+            </button>
+            @if (isDropdownOpen)
+            {
+                <ul class="dropdown-menu dropdown-menu-end show" style="position: absolute; right: 0; min-width: 200px; max-width: 250px;">
+                    <li><span class="dropdown-item-text"><strong>@Session.CurrentUser?.Role</strong></span></li>
+                    <li><span class="dropdown-item-text text-muted small" style="overflow-wrap: break-word;">@Session.CurrentUser?.Email</span></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><button class="dropdown-item text-danger" @onclick="Logout">Logout</button></li>
+                </ul>
+            }
+        </div>
+    }
+    else
+    {
+        <a href="/login" class="btn btn-primary btn-sm">Login</a>
+    }
+</div>
+
+@code {
+    private bool isDropdownOpen = false;
+
+    protected override void OnInitialized()
+    {
+        Session.OnChange += StateHasChanged;
+    }
+    
+    private void ToggleDropdown()
+    {
+        isDropdownOpen = !isDropdownOpen;
+    }
+    
+    private void Logout()
+    {
+        isDropdownOpen = false;
+        Session.Logout();
+        Nav.NavigateTo("/login");
+    }
+    
+    public void Dispose()
+    {
+        Session.OnChange -= StateHasChanged;
+    }
+}

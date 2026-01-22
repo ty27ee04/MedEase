@@ -73,6 +73,13 @@
                             <input class="form-control" value="@editingModel.Type" disabled />
                         </div>
                     </div>
+
+                    <div class="row">
+                        <div class="col-md-12 mb-3">
+                            <label class="form-label"><strong>Remark / Reason:</strong></label>
+                            <textarea class="form-control" @bind="editingModel.Remark" rows="3" placeholder="Enter reason for appointment"></textarea>
+                        </div>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button class="btn btn-secondary" @onclick="CancelEdit">
@@ -201,6 +208,7 @@
                             <th>Date & Time</th>
                             <th>Type</th>
                             <th>Status</th>
+                            <th>Remark</th>
                             <th>Time Until</th>
                             <th>Actions</th>
                         </tr>
@@ -230,6 +238,16 @@
                                     <span class="badge @GetStatusBadgeClass(appt.Status)">
                                         @appt.Status
                                     </span>
+                                </td>
+                                <td>
+                                    @if (!string.IsNullOrEmpty(appt.Remark))
+                                    {
+                                        <small class="text-muted">@appt.Remark</small>
+                                    }
+                                    else
+                                    {
+                                        <small class="text-muted fst-italic">No remark</small>
+                                    }
                                 </td>
                                 <td>
                                     <span class="@GetTimeUntilClass(hoursUntil)">

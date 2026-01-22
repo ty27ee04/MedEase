@@ -536,29 +536,47 @@ public void AddAppointment(AppointmentModel appt)
                     hasFolderName = false;
                 }
                 
+                // Check if InFolder column exists (new name)
+                bool hasInFolder = false;
+                try
+                {
+                    string checkSql = "SELECT InFolder FROM PatientRecord LIMIT 1";
+                    using (var checkCmd = new MySqlCommand(checkSql, conn))
+                    {
+                        checkCmd.ExecuteScalar();
+                        hasInFolder = true;
+                    }
+                }
+                catch (MySqlException)
+                {
+                    hasInFolder = false;
+                }
+                
+                string columnName = hasInFolder ? "InFolder" : "parentFolderID";
+                
                 string sql;
                 if (hasTimestamps && hasFolderName)
                 {
-                    sql = @"UPDATE PatientRecord 
-                           SET title = @title, details = @details, FolderName = @folderName, lastUpdated = NOW() 
+                    sql = $@"UPDATE PatientRecord 
+                           SET title = @title, details = @details, FolderName = @folderName, {columnName} = @inFolder, lastUpdated = NOW() 
                            WHERE recordID = @rid";
                 }
                 else if (hasTimestamps)
                 {
-                    sql = @"UPDATE PatientRecord 
-                           SET title = @title, details = @details, lastUpdated = NOW() 
+                    sql = $@"UPDATE PatientRecord 
+                           SET title = @title, details = @details, {columnName} = @inFolder, lastUpdated = NOW() 
                            WHERE recordID = @rid";
                 }
                 else if (hasFolderName)
                 {
-                    sql = @"UPDATE PatientRecord 
-                           SET title = @title, details = @details, FolderName = @folderName 
+                    sql = $@"UPDATE PatientRecord 
+                           SET title = @title, details = @details, FolderName = @folderName, {columnName} = @inFolder 
                            WHERE recordID = @rid";
                 }
                 else
                 {
-                    sql = @"UPDATE PatientRecord 
-                           SET title = @title, details = @details 
+                    sql = $@"UPDATE PatientRecord 
+                           SET title = @title, details = @details, {columnName} = @inFolder 
                            WHERE recordID = @rid";
                 }
                 
@@ -567,6 +585,7 @@ public void AddAppointment(AppointmentModel appt)
                     cmd.Parameters.AddWithValue("@rid", record.RecordID);
                     cmd.Parameters.AddWithValue("@title", record.Title);
                     cmd.Parameters.AddWithValue("@details", record.Details ?? "");
+                    cmd.Parameters.AddWithValue("@inFolder", record.InFolder.HasValue ? (object)record.InFolder.Value : DBNull.Value);
                     if (hasFolderName)
                     {
                         cmd.Parameters.AddWithValue("@folderName", record.FolderName ?? "");

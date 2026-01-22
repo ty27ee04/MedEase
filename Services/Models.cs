@@ -9,9 +9,42 @@ namespace HealthTech.Services
         public string Name { get; set; } = "";
         public string Role { get; set; } = ""; // 'Doctor', 'Patient', 'Receptionist'
         public string Email { get; set; } = "";
+        public string Password { get; set; } = ""; // Note: In production, use hashed passwords
         public string Phone { get; set; } = "";
         public int? Age { get; set; }
         public string Gender { get; set; } = "";
+        public string? Specialization { get; set; } // For Doctors only
+        public string? LicenseNumber { get; set; } // For Doctors only
+        public DateTime? CreatedAt { get; set; }
+    }
+    
+    // Request model for login
+    public class LoginRequest
+    {
+        public string Email { get; set; } = "";
+        public string Password { get; set; } = "";
+    }
+    
+    // Response model for login
+    public class LoginResponse
+    {
+        public bool Success { get; set; }
+        public string Message { get; set; } = "";
+        public User? User { get; set; }
+    }
+    
+    // Request model for registration
+    public class RegisterRequest
+    {
+        public string Name { get; set; } = "";
+        public string Email { get; set; } = "";
+        public string Password { get; set; } = "";
+        public string Phone { get; set; } = "";
+        public string Role { get; set; } = ""; // 'Doctor' or 'Receptionist'
+        public int? Age { get; set; }
+        public string Gender { get; set; } = "";
+        public string? Specialization { get; set; } // Required for Doctor
+        public string? LicenseNumber { get; set; } // Required for Doctor
     }
 
     // Matches the 'Room' table
@@ -33,6 +66,7 @@ namespace HealthTech.Services
         public string Status { get; set; } = "Pending";
         public DateTime DateTime { get; set; }
         public string? Link { get; set; } // For Zoom links
+        public string? Remark { get; set; } // Reason for appointment
         
         // Helper properties for display (we will JOIN these in SQL)
         public string PatientName { get; set; } = "";
@@ -54,18 +88,26 @@ namespace HealthTech.Services
     }
     
     // Matches the 'WorkingTime' table for doctor availability
+    // Matches the 'workingtime' table for doctor availability
     public class WorkingTime
     {
-        public int WorkingTimeID { get; set; }
-        public int DoctorID { get; set; }
-        public TimeSpan StartTime { get; set; }
-        public TimeSpan EndTime { get; set; }
-        public DateTime? Date { get; set; } // Specific date (for on-leave/off-day)
-        public string Day { get; set; } = ""; // Monday-Sunday
-        public string Type { get; set; } = "Working"; // 'Working', 'OnLeave', 'OffDay'
+        public int WorkingID { get; set; } // Database column: workingID
+        public int DoctorID { get; set; } // Database column: doctorID
+        public TimeSpan? StartTime { get; set; } // Database column: startTime
+        public TimeSpan? EndTime { get; set; } // Database column: endTime
+        public DateTime? Date { get; set; } // Database column: date - Specific date (for on-leave/off-day)
+        public string Day { get; set; } = ""; // Database column: day - Monday-Sunday
+        public string Type { get; set; } = "working"; // Database column: type - enum('working','on leave','off day')
         
         // Helper properties
         public string DoctorName { get; set; } = "";
+        
+        // Compatibility property for existing code
+        public int WorkingTimeID 
+        { 
+            get => WorkingID; 
+            set => WorkingID = value; 
+        }
     }
     
     // Time slot for appointment booking

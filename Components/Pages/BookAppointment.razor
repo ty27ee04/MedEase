@@ -102,6 +102,13 @@
         </div>
     </div>
 
+    <div class="row">
+        <div class="col-md-12 mb-3">
+            <label><strong>Reason / Remarks:</strong></label>
+            <textarea class="form-control" @bind="appointmentRemark" rows="3" placeholder="Enter reason for appointment (e.g., Follow-up, Fever, Checkup, etc.)"></textarea>
+        </div>
+    </div>
+
     @if (selectedDateTime.HasValue)
     {
         <div class="alert alert-info">
@@ -142,6 +149,7 @@
     private DateTime selectedDate = DateTime.Now.Date.AddDays(1); // Default to tomorrow
     private DateTime? selectedDateTime = null;
     private string selectedTimeSlotString = ""; // For dropdown binding
+    private string appointmentRemark = ""; // Reason for appointment
     
     private string bookingResult = "";
     private bool isProcessing = false;
@@ -274,6 +282,7 @@
                 DateTime = selectedDateTime.Value,
                 Status = "Confirmed",
                 Link = (selectedType == "Online") ? details : null,
+                Remark = string.IsNullOrWhiteSpace(appointmentRemark) ? null : appointmentRemark.Trim(),
                 PatientName = patient.Name,
                 DoctorName = doctor.Name
             };

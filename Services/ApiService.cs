@@ -214,22 +214,69 @@ namespace HealthTech.Services
                 return new List<User>();
             }
         }
-
-        public async Task<User?> LoginAsync(string username, string password)
+        
+        // ==================== AUTHENTICATION ====================
+        
+        public async Task<LoginResponse> LoginAsync(string email, string password)
         {
             try
             {
-                var response = await _httpClient.PostAsJsonAsync($"{_baseUrl}/users/login", 
-                    new { username, password });
+                var request = new LoginRequest { Email = email, Password = password };
+                var response = await _httpClient.PostAsJsonAsync($"{_baseUrl}/auth/login", request);
                 
-                if (!response.IsSuccessStatusCode)
-                    return null;
-                    
-                return await response.Content.ReadFromJsonAsync<User>();
+                if (response.IsSuccessStatusCode)
+                {
+                    return await response.Content.ReadFromJsonAsync<LoginResponse>() 
+                           ?? new LoginResponse { Success = false, Message = "Invalid response from server" };
+                }
+                
+                return new LoginResponse { Success = false, Message = "Login failed" };
             }
-            catch
+            catch (HttpRequestException)
             {
-                return null;
+                LastError = "Cannot connect to API. Is HealthTech.API running?";
+                throw new Exception("API Connection Error: Please start HealthTech.API first.");
+            }
+            catch (TaskCanceledException)
+            {
+                LastError = "API request timeout.";
+                throw new Exception("API Timeout: Cannot reach HealthTech.API.");
+            }
+            catch (Exception ex)
+            {
+                LastError = $"API Error: {ex.Message}";
+                return new LoginResponse { Success = false, Message = ex.Message };
+            }
+        }
+        
+        public async Task<LoginResponse> RegisterAsync(RegisterRequest request)
+        {
+            try
+            {
+                var response = await _httpClient.PostAsJsonAsync($"{_baseUrl}/auth/register", request);
+                
+                if (response.IsSuccessStatusCode)
+                {
+                    return await response.Content.ReadFromJsonAsync<LoginResponse>() 
+                           ?? new LoginResponse { Success = false, Message = "Invalid response from server" };
+                }
+                
+                return new LoginResponse { Success = false, Message = "Registration failed" };
+            }
+            catch (HttpRequestException)
+            {
+                LastError = "Cannot connect to API. Is HealthTech.API running?";
+                throw new Exception("API Connection Error: Please start HealthTech.API first.");
+            }
+            catch (TaskCanceledException)
+            {
+                LastError = "API request timeout.";
+                throw new Exception("API Timeout: Cannot reach HealthTech.API.");
+            }
+            catch (Exception ex)
+            {
+                LastError = $"API Error: {ex.Message}";
+                return new LoginResponse { Success = false, Message = ex.Message };
             }
         }
 
@@ -359,6 +406,53 @@ namespace HealthTech.Services
             }
             catch
             {
+                return false;
+            }
+        }
+        
+        public async Task<bool> SaveScheduleAsync(int doctorId, List<WorkingTime> workingTimes)
+        {
+            try
+            {
+                var request = new { DoctorId = doctorId, WorkingTimes = workingTimes };
+                var response = await _httpClient.PostAsJsonAsync(
+                    $"{_baseUrl}/workingtime/save-schedule", request);
+                return response.IsSuccessStatusCode;
+            }
+            catch (Exception ex)
+            {
+                LastError = $"Error saving schedule: {ex.Message}";
+                return false;
+            }
+        }
+        
+        public async Task<bool> SaveLeavesAsync(int doctorId, List<DateTime> leaveDates)
+        {
+            try
+            {
+                var request = new { DoctorId = doctorId, LeaveDates = leaveDates };
+                var response = await _httpClient.PostAsJsonAsync(
+                    $"{_baseUrl}/workingtime/save-leaves", request);
+                return response.IsSuccessStatusCode;
+            }
+            catch (Exception ex)
+            {
+                LastError = $"Error saving leaves: {ex.Message}";
+                return false;
+            }
+        }
+        
+        public async Task<bool> DeleteLeaveAsync(int doctorId, DateTime date)
+        {
+            try
+            {
+                var response = await _httpClient.DeleteAsync(
+                    $"{_baseUrl}/workingtime/leave?doctorId={doctorId}&date={date:yyyy-MM-dd}");
+                return response.IsSuccessStatusCode;
+            }
+            catch (Exception ex)
+            {
+                LastError = $"Error deleting leave: {ex.Message}";
                 return false;
             }
         }

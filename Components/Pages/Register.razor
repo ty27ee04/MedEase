@@ -1,0 +1,249 @@
+@page "/register"
+@rendermode InteractiveServer
+@using HealthTech.Services
+@inject UserSession Session
+@inject NavigationManager Nav
+@inject ApiService ApiService
+
+<PageTitle>Register</PageTitle>
+
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white text-center">
+                    <h3>MedEase Registration</h3>
+                </div>
+                <div class="card-body">
+                    @if (!string.IsNullOrEmpty(message))
+                    {
+                        <div class="alert @(isSuccess ? "alert-success" : "alert-danger") alert-dismissible fade show" role="alert">
+                            @message
+                            <button type="button" class="btn-close" @onclick="() => message = string.Empty"></button>
+                        </div>
+                    }
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Name <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" @bind="name" placeholder="Enter full name" />
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Email <span class="text-danger">*</span></label>
+                            <input type="email" class="form-control" @bind="email" placeholder="Enter email address" />
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Password <span class="text-danger">*</span></label>
+                            <input type="password" class="form-control" @bind="password" placeholder="Enter password" />
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Phone</label>
+                            <input type="tel" class="form-control" @bind="phone" placeholder="Enter phone number" />
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Role <span class="text-danger">*</span></label>
+                            <select class="form-select" @bind="role">
+                                <option value="">Select Role</option>
+                                <option value="Doctor">Doctor</option>
+                                <option value="Receptionist">Receptionist</option>
+                            </select>
+                        </div>
+                        
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">Age</label>
+                            <input type="number" class="form-control" @bind="age" placeholder="Age" min="1" max="120" />
+                        </div>
+                        
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">Gender</label>
+                            <select class="form-select" @bind="gender">
+                                <option value="">Select</option>
+                                <option value="Male">Male</option>
+                                <option value="Female">Female</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    @if (role == "Doctor")
+                    {
+                        <div class="alert alert-info">
+                            <strong>Doctor Information Required</strong>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Specialization <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" @bind="specialization" 
+                                       placeholder="e.g., Cardiology, Pediatrics" />
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">License Number <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" @bind="licenseNumber" 
+                                       placeholder="Enter medical license number" />
+                            </div>
+                        </div>
+                    }
+
+                    <div class="d-grid gap-2 mt-4">
+                        <button class="btn btn-success btn-lg" @onclick="DoRegister" disabled="@isProcessing">
+                            @if (isProcessing)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                <span>Processing...</span>
+                            }
+                            else
+                            {
+                                <span>Create Account</span>
+                            }
+                        </button>
+                        
+                        <button class="btn btn-outline-secondary" @onclick="GoToLogin">
+                            Already have an account? Login
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private string name = "";
+    private string email = "";
+    private string password = "";
+    private string phone = "";
+    private string role = "";
+    private int? age = null;
+    private string gender = "";
+    private string specialization = "";
+    private string licenseNumber = "";
+    
+    private string message = "";
+    private bool isSuccess = false;
+    private bool isProcessing = false;
+
+    private async Task DoRegister()
+    {
+        message = "";
+        isSuccess = false;
+        
+        // Validation
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            message = "Name is required";
+            return;
+        }
+        
+        if (string.IsNullOrWhiteSpace(email))
+        {
+            message = "Email is required";
+            return;
+        }
+        
+        if (!email.Contains("@"))
+        {
+            message = "Please enter a valid email address";
+            return;
+        }
+        
+        if (string.IsNullOrWhiteSpace(password))
+        {
+            message = "Password is required";
+            return;
+        }
+        
+        if (password.Length < 6)
+        {
+            message = "Password must be at least 6 characters long";
+            return;
+        }
+        
+        if (string.IsNullOrWhiteSpace(role))
+        {
+            message = "Please select a role";
+            return;
+        }
+        
+        // Doctor-specific validation
+        if (role == "Doctor")
+        {
+            if (string.IsNullOrWhiteSpace(specialization))
+            {
+                message = "Specialization is required for doctors";
+                return;
+            }
+            
+            if (string.IsNullOrWhiteSpace(licenseNumber))
+            {
+                message = "License number is required for doctors";
+                return;
+            }
+        }
+        
+        isProcessing = true;
+        
+        try
+        {
+            var request = new RegisterRequest
+            {
+                Name = name,
+                Email = email,
+                Password = password,
+                Phone = phone,
+                Role = role,
+                Age = age,
+                Gender = gender,
+                Specialization = role == "Doctor" ? specialization : null,
+                LicenseNumber = role == "Doctor" ? licenseNumber : null
+            };
+            
+            var response = await ApiService.RegisterAsync(request);
+            
+            if (response.Success && response.User != null)
+            {
+                message = "Registration successful! Redirecting to login...";
+                isSuccess = true;
+                
+                // Wait a moment then redirect to login
+                await Task.Delay(1500);
+                Nav.NavigateTo("/login");
+            }
+            else
+            {
+                message = response.Message;
+                isSuccess = false;
+            }
+        }
+        catch (Exception ex)
+        {
+            if (ex.Message.Contains("API Connection") || ex.Message.Contains("API Timeout"))
+            {
+                message = "⚠️ Cannot connect to server. Please make sure HealthTech.API is running!";
+            }
+            else
+            {
+                message = "Error: " + ex.Message;
+            }
+            isSuccess = false;
+        }
+        finally
+        {
+            isProcessing = false;
+        }
+    }
+    
+    private void GoToLogin()
+    {
+        Nav.NavigateTo("/login");
+    }
+}

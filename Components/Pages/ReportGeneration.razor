@@ -1,128 +1,362 @@
 @page "/reports"
 @using System.Data
 @using HealthTech.Services
+@using Microsoft.JSInterop
 @rendermode InteractiveServer
+@inject IJSRuntime JSRuntime
 
-<h3>Report Generation</h3>
+<PageTitle>Report Generation</PageTitle>
 
-<div class="card p-3">
+<div class="container-fluid mt-3">
+    <h1>📊 Report Generation</h1>
+    <p>Generate medical and operation reports in PDF, CSV, or JSON format</p>
 
-    <label>Report Type:</label>
-    <select @bind="selectedReportType" class="form-control">
-        <option value="">-- Select --</option>
-        <option value="Medical">Medical Report</option>
-        <option value="Operation">Operation Report</option>
-    </select>
+    <div class="row">
+        <div class="col-md-4">
+            <!-- Report Configuration Card -->
+            <div class="card mb-3">
+                <div class="card-header bg-primary text-white">
+                    <strong>📋 Report Configuration</strong>
+                </div>
+                <div class="card-body">
+                    <!-- Report Type -->
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Report Type *</label>
+                        <select @bind="selectedReportType" @bind:after="OnReportTypeChanged" class="form-control">
+                            <option value="">-- Select Report Type --</option>
+                            <option value="Medical">📄 Medical Report (Patient Records)</option>
+                            <option value="Operation">🏥 Operation Report (Appointments)</option>
+                        </select>
+                        <small class="text-muted">Choose the type of report to generate</small>
+                    </div>
 
-    <br />
+                    <!-- Export Format -->
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Export Format *</label>
+                        <select @bind="selectedFormat" class="form-control">
+                            <option value="Preview">👁️ Preview (HTML)</option>
+                            <option value="PDF">🖨️ PDF (Print to PDF)</option>
+                            <option value="CSV">📊 CSV (Excel)</option>
+                            <option value="JSON">💾 JSON</option>
+                        </select>
+                        <small class="text-muted">PDF opens print dialog - select 'Save as PDF' as printer</small>
+                    </div>
 
-    <label>Export Format:</label>
-    <select @bind="selectedFormat" class="form-control">
-        <option value="">-- Select --</option>
-        <option value="PDF">PDF</option>
-        <option value="CSV">CSV</option>
-        <option value="JSON">JSON</option>
-    </select>
+                    <hr />
 
-    <br />
+                    <!-- Medical Report Options -->
+                    @if (selectedReportType == "Medical")
+                    {
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Patient *</label>
+                            <select @bind="selectedPatientId" class="form-control">
+                                <option value="0">-- Select Patient --</option>
+                                @foreach (var patient in allPatients)
+                                {
+                                    <option value="@patient.UserID">@patient.Name (@patient.Email)</option>
+                                }
+                            </select>
+                        </div>
 
-    @if (selectedReportType == "Medical")
-    {
-        <label>Patient ID:</label>
-        <input type="number" class="form-control" @bind="patientId" />
-    }
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Date Range</label>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="dateOption" id="allDates" 
+                                       checked="@useAllDates" @onchange="() => useAllDates = true">
+                                <label class="form-check-label" for="allDates">
+                                    All Records
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="dateOption" id="dateRange" 
+                                       checked="@(!useAllDates)" @onchange="() => useAllDates = false">
+                                <label class="form-check-label" for="dateRange">
+                                    Specific Date Range
+                                </label>
+                            </div>
+                        </div>
 
-    @if (selectedReportType == "Operation")
-    {
-        <label>Start Date:</label>
-        <input type="date" class="form-control" @bind="startDate" />
-        <label>End Date:</label>
-        <input type="date" class="form-control" @bind="endDate" />
-    }
+                        @if (!useAllDates)
+                        {
+                            <div class="mb-3">
+                                <label class="form-label">Start Date</label>
+                                <input type="date" class="form-control" @bind="medicalStartDate" />
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">End Date</label>
+                                <input type="date" class="form-control" @bind="medicalEndDate" />
+                            </div>
+                        }
+                    }
 
-    <br />
+                    <!-- Operation Report Options -->
+                    @if (selectedReportType == "Operation")
+                    {
+                        <div class="alert alert-info">
+                            <small>Default: 7 days before and after today</small>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Start Date</label>
+                            <input type="date" class="form-control" @bind="operationStartDate" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">End Date</label>
+                            <input type="date" class="form-control" @bind="operationEndDate" />
+                        </div>
+                    }
 
-    <button class="btn btn-primary" @onclick="GenerateReport">
-        Generate Report
-    </button>
+                    <!-- Generate Button -->
+                    <button class="btn btn-success w-100" @onclick="GenerateReport" disabled="@string.IsNullOrEmpty(selectedReportType)">
+                        🚀 Generate Report
+                    </button>
 
-    <br /><br />
-
-    <h5>Preview</h5>
-    @if (string.IsNullOrEmpty(reportOutput))
-    {
-        <p class="text-muted">No report generated yet.</p>
-    }
-    else
-    {
-        <div class="bg-light p-4 rounded">
-            @((MarkupString)reportOutput)
+                    @if (!string.IsNullOrEmpty(statusMessage))
+                    {
+                        <div class="alert @(isError ? "alert-danger" : "alert-success") mt-3 mb-0">
+                            @statusMessage
+                        </div>
+                    }
+                </div>
+            </div>
         </div>
-    }
 
+        <div class="col-md-8">
+            <!-- Preview/Download Card -->
+            <div class="card">
+                <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+                    <strong>👁️ Report Preview</strong>
+                    @if (reportGenerated && selectedFormat != "Preview")
+                    {
+                        @if (selectedFormat == "PDF")
+                        {
+                            <button class="btn btn-sm btn-light" @onclick="PrintReport">
+                                🖨️ Print to PDF
+                            </button>
+                        }
+                        else
+                        {
+                            <button class="btn btn-sm btn-light" @onclick="DownloadReport">
+                                ⬇️ Download @selectedFormat
+                            </button>
+                        }
+                    }
+                </div>
+                <div class="card-body" style="max-height: 600px; overflow-y: auto;">
+                    @if (string.IsNullOrEmpty(reportOutput))
+                    {
+                        <div class="text-center text-muted p-5">
+                            <i class="bi bi-file-earmark-text" style="font-size: 4rem;"></i>
+                            <p class="mt-3">No report generated yet.</p>
+                            <p><small>Select report type and options, then click "Generate Report"</small></p>
+                        </div>
+                    }
+                    else if (selectedFormat == "Preview")
+                    {
+                        <div>
+                            @((MarkupString)reportOutput)
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="bg-light p-3 rounded">
+                            <h6>Report Generated Successfully!</h6>
+                            <p>Format: <strong>@selectedFormat</strong></p>
+                            <p>Size: <strong>@(reportOutput.Length) characters</strong></p>
+                            @if (selectedFormat == "PDF")
+                            {
+                                <p class="text-muted">Click the "Print to PDF" button above to open print dialog, then select "Save as PDF" as printer.</p>
+                            }
+                            else
+                            {
+                                <p class="text-muted">Click the "Download" button above to save the file.</p>
+                            }
+                            <hr />
+                            <details>
+                                <summary class="btn btn-sm btn-outline-secondary">View Raw Content</summary>
+                                <pre class="mt-2 p-2 bg-white border" style="max-height: 300px; overflow-y: auto;">@reportOutput</pre>
+                            </details>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
 @code {
-    string selectedReportType = "";
-    string selectedFormat = "";
-    string reportOutput = "";
+    // Report configuration
+    private string selectedReportType = "";
+    private string selectedFormat = "Preview";
+    private string reportOutput = "";
+    private bool reportGenerated = false;
+    private IExportStrategy? currentExportStrategy;
 
-    int patientId;
-    DateTime startDate = DateTime.Now.AddDays(-7);
-    DateTime endDate = DateTime.Now;
-    void GenerateReport()
-{
-    var context = new ReportContext();
+    // Medical report settings
+    private List<User> allPatients = new List<User>();
+    private int selectedPatientId = 0;
+    private bool useAllDates = true;
+    private DateTime medicalStartDate = DateTime.Now.AddMonths(-1);
+    private DateTime medicalEndDate = DateTime.Now;
 
-    if (selectedReportType == "Medical")
-        context.SetReportType(new MedicalReportStrategy());
-    else
-        context.SetReportType(new OperationReportStrategy());
+    // Operation report settings
+    private DateTime operationStartDate = DateTime.Now.AddDays(-7);
+    private DateTime operationEndDate = DateTime.Now.AddDays(7);
 
-    if (selectedFormat == "CSV")
-        context.SetExportType(new CsvExportStrategy());
-    else if (selectedFormat == "JSON")
-        context.SetExportType(new JsonExportStrategy());
-    else
-        context.SetExportType(new HtmlPreviewStrategy());  // Preview
+    // Status
+    private string statusMessage = "";
+    private bool isError = false;
 
-    object requestData = selectedReportType == "Medical"
-        ? patientId
-        : Tuple.Create(startDate, endDate);
-
-    reportOutput = context.Generate(requestData);
-}
-
-    string ConvertTableToText(DataTable table)
+    protected override async Task OnInitializedAsync()
     {
-        if (table.Rows.Count == 0)
-            return "<p><strong>No records found.</strong></p>";
+        await LoadPatients();
+    }
 
-        string html = "<table class='table table-bordered table-striped'>";
-        html += "<thead class='table-dark'><tr>";
-
-        foreach (DataColumn col in table.Columns)
+    private async Task LoadPatients()
+    {
+        try
         {
-            string niceName = col.ColumnName
-                .Replace("FullName", "Name")
-                .Replace("VisitDate", "Visit Date")
-                .Replace("OperationDate", "Operation Date");
+            var service = new ReportDataService();
+            var patientsTable = service.GetAllPatients();
 
-            html += $"<th>{niceName}</th>";
+            allPatients.Clear();
+            foreach (DataRow row in patientsTable.Rows)
+            {
+                allPatients.Add(new User
+                {
+                    UserID = Convert.ToInt32(row["userID"]),
+                    Name = row["name"].ToString() ?? "",
+                    Email = row["email"].ToString() ?? ""
+                });
+            }
         }
-
-        html += "</tr></thead><tbody>";
-
-        foreach (DataRow row in table.Rows)
+        catch (Exception ex)
         {
-            html += "<tr>";
-            foreach (var item in row.ItemArray)
-                html += $"<td>{item}</td>";
-            html += "</tr>";
+            statusMessage = $"Error loading patients: {ex.Message}";
+            isError = true;
         }
+    }
 
-        html += "</tbody></table>";
+    private void OnReportTypeChanged()
+    {
+        reportOutput = "";
+        reportGenerated = false;
+        statusMessage = "";
+    }
 
-        return html;
+    private void GenerateReport()
+    {
+        try
+        {
+            // Validation
+            if (string.IsNullOrEmpty(selectedReportType))
+            {
+                statusMessage = "❌ Please select a report type";
+                isError = true;
+                return;
+            }
+
+            if (selectedReportType == "Medical" && selectedPatientId == 0)
+            {
+                statusMessage = "❌ Please select a patient";
+                isError = true;
+                return;
+            }
+
+            // Setup report context
+            var context = new ReportContext();
+
+            // Set report type strategy
+            object requestData;
+            if (selectedReportType == "Medical")
+            {
+                context.SetReportType(new MedicalReportStrategy());
+                requestData = new MedicalReportRequest
+                {
+                    PatientId = selectedPatientId,
+                    UseAllDates = useAllDates,
+                    StartDate = medicalStartDate,
+                    EndDate = medicalEndDate
+                };
+            }
+            else // Operation
+            {
+                context.SetReportType(new OperationReportStrategy());
+                requestData = new OperationReportRequest
+                {
+                    StartDate = operationStartDate,
+                    EndDate = operationEndDate
+                };
+            }
+
+            // Set export format strategy
+            if (selectedFormat == "CSV")
+                currentExportStrategy = new CsvExportStrategy();
+            else if (selectedFormat == "JSON")
+                currentExportStrategy = new JsonExportStrategy();
+            else if (selectedFormat == "PDF")
+                currentExportStrategy = new PdfExportStrategy();
+            else
+                currentExportStrategy = new HtmlPreviewStrategy();
+
+            context.SetExportType(currentExportStrategy);
+
+            // Generate report
+            reportOutput = context.Generate(requestData);
+            reportGenerated = true;
+
+            statusMessage = $"✅ Report generated successfully! ({reportOutput.Length} characters)";
+            isError = false;
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"❌ Error generating report: {ex.Message}";
+            isError = true;
+            reportGenerated = false;
+        }
+    }
+
+    private async Task DownloadReport()
+    {
+        try
+        {
+            if (currentExportStrategy == null || string.IsNullOrEmpty(reportOutput))
+                return;
+
+            var fileName = $"{selectedReportType}Report_{DateTime.Now:yyyyMMdd_HHmmss}{currentExportStrategy.GetFileExtension()}";
+            var bytes = System.Text.Encoding.UTF8.GetBytes(reportOutput);
+            var base64 = Convert.ToBase64String(bytes);
+
+            await JSRuntime.InvokeVoidAsync("downloadFile", fileName, base64, currentExportStrategy.GetContentType());
+            
+            statusMessage = $"✅ Downloaded: {fileName}";
+            isError = false;
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"❌ Error downloading: {ex.Message}";
+            isError = true;
+        }
+    }
+
+    private async Task PrintReport()
+    {
+        try
+        {
+            if (currentExportStrategy == null || string.IsNullOrEmpty(reportOutput))
+                return;
+
+            var bytes = System.Text.Encoding.UTF8.GetBytes(reportOutput);
+            var base64 = Convert.ToBase64String(bytes);
+
+            await JSRuntime.InvokeVoidAsync("printHtmlContent", base64);
+            
+            statusMessage = $"✅ Print dialog opened - Select 'Save as PDF' as printer";
+            isError = false;
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"❌ Error opening print dialog: {ex.Message}";
+            isError = true;
+        }
     }
 }

@@ -1,68 +1,1083 @@
-@page "/doctor-dashboard"
-@rendermode InteractiveServer
+﻿@page "/doctor"
 @using HealthTech.Services
+@inject NavigationManager Nav
+@inject UserSession Session
+@inject ApiService ApiService
+@rendermode InteractiveServer
 
-<PageTitle>Doctor Dashboard</PageTitle>
+@if (!isAuthorized)
+{
+    <div class="alert alert-danger m-4">
+        <h4>Access Denied</h4>
+        <p>You must be logged in as a Doctor to access this page.</p>
+        <p>Redirecting to home page...</p>
+    </div>
+}
+else
+{
+<div class="dashboard-wrap">
+    <h3 class="page-title">Doctor Dashboard</h3>
+    <p class="page-subtitle">Working schedule + today's appointments + quick access to patient records</p>
 
-<h1>Doctor Dashboard & Analytics</h1>
-<p>Use the <strong>Strategy Pattern</strong> to export your daily statistics.</p>
-
-<div class="card p-4">
-    <h4>Daily Appointment Summary</h4>
-    <p>Total Patients Seen: <strong>12</strong></p>
-    <p>Pending Reviews: <strong>3</strong></p>
-
-    <hr />
-
-    <div class="mb-3">
-        <label>Select Export Format:</label>
-        <select class="form-control" @bind="selectedFormat">
-            <option value="pdf">PDF Document (.pdf)</option>
-            <option value="csv">Excel Spreadsheet (.csv)</option>
-        </select>
+    <!-- Working Settings - Button to open modal -->
+    <div class="panel">
+        <div class="panel-title">Working Schedule Management</div>
+        <p class="hint mb-3">Configure your weekly working hours and manage leave days</p>
+        
+        <div class="actions-row">
+            <button class="btn" @onclick="OpenWorkingScheduleModal">Set Working Schedule</button>
+            <div class="saved-hint">@ScheduleMessage</div>
+        </div>
     </div>
 
-    <button class="btn btn-primary" @onclick="DownloadReport">Generate Report</button>
+    <!-- KPI -->
+    <div class="kpi-grid">
+        <div class="kpi-card">
+            <div class="kpi-header">
+                <span class="kpi-label">Today's Appointments</span>
+                <span class="kpi-badge badge-blue">Today</span>
+            </div>
+            <div class="kpi-value">@TodayAppointments</div>
+            <div class="kpi-hint">Total scheduled consultations.</div>
+        </div>
+
+        <div class="kpi-card">
+            <div class="kpi-header">
+                <span class="kpi-label">Completed</span>
+                <span class="kpi-badge badge-green">Done</span>
+            </div>
+            <div class="kpi-value">@CompletedConsultations</div>
+            <div class="kpi-hint">Patients already served today.</div>
+        </div>
+
+        <div class="kpi-card">
+            <div class="kpi-header">
+                <span class="kpi-label">Pending Reviews</span>
+                <span class="kpi-badge badge-orange">Pending</span>
+            </div>
+            <div class="kpi-value">@PendingLabReports</div>
+            <div class="kpi-hint">Reports / lab results waiting review.</div>
+        </div>
+
+        <div class="kpi-card">
+            <div class="kpi-header">
+                <span class="kpi-label">Doctor Status</span>
+                <span class="kpi-badge badge-purple">@DoctorStatusBadge</span>
+            </div>
+            <div class="kpi-value">@DoctorStatusValue</div>
+            <div class="kpi-hint">@DoctorStatusHint</div>
+        </div>
+    </div>
+
+    <!-- (2) Today schedule + edit appointment date/time -->
+    <div class="panel">
+        <div class="panel-title">Today Patient Schedule</div>
+
+        @if (TodaySchedule == null || TodaySchedule.Count == 0)
+        {
+            <div class="empty">No appointments for today.</div>
+        }
+        else
+        {
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th style="width:120px;">Time</th>
+                        <th>Patient</th>
+                        <th>Reason</th>
+                        <th style="width:140px;">Status</th>
+                        <th style="width:260px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var a in TodaySchedule)
+                    {
+                        var isEditing = (EditingPatientId == a.PatientId);
+
+                        <tr>
+                            <td>
+                                @if (!isEditing)
+                                {
+                                    @a.AppointmentDateTime.ToString("HH:mm")
+                                }
+                                else
+                                {
+                                    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                                        <input class="input" type="date" @bind="InlineEditDate" />
+                                        <input class="input" type="time" @bind="InlineEditTime" />
+                                    </div>
+                                }
+                            </td>
+
+                            <td>
+                                <span style="font-weight:700;">@a.PatientName</span>
+                                <span class="muted">(ID: @a.PatientId)</span>
+                            </td>
+
+                            <td>@a.Reason</td>
+
+                            <td>
+                                <span class="status @GetStatusClass(a.Status)">@a.Status</span>
+                            </td>
+
+                            <td class="actions-cell">
+                                @if (!isEditing)
+                                {
+                                    <button class="btn-sm" @onclick="() => StartInlineEdit(a)">Edit Date/Time</button>
+
+                                    <button class="btn-sm btn-sm-outline"
+                                            @onclick="() => GoPatientRecords(a.PatientId)">
+                                        Patient Records / Add Diagnosis
+                                    </button>
+                                }
+                                else
+                                {
+                                    <button class="btn-sm" @onclick="SaveInlineEdit">Save</button>
+                                    <button class="btn-sm btn-sm-outline" @onclick="CancelInlineEdit">Cancel</button>
+
+                                    <div class="tiny-note" style="margin-top:6px;">
+                                        @InlineEditMessage
+                                    </div>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+
+            </table>
+
+            <div class="tiny-note">
+                Tip: Edit appointment date/time uses mock update now. Later replace with DB update.
+            </div>
+        }
+    </div>
+
+    
+
 </div>
 
-@if (!string.IsNullOrEmpty(exportResult))
+@* Working Schedule Modal *@
+@if (IsWorkingScheduleModalOpen)
 {
-    <div class="card mt-4 bg-light">
-        <div class="card-body">
-            <h5>Output Preview:</h5>
-            <pre>@exportResult</pre>
+    <div class="modal-backdrop" @onclick="CloseWorkingScheduleModal">
+        <div class="modal-large" @onclick:stopPropagation="true">
+            <div class="modal-header">
+                <h4 class="modal-title">
+                    @if (scheduleMode == "schedule")
+                    {
+                        <text>Set Weekly Working Schedule</text>
+                    }
+                    else
+                    {
+                        <text>Manage Leave Days</text>
+                    }
+                </h4>
+                <div class="mode-switcher">
+                    <select class="input" @bind="scheduleMode" @bind:after="OnScheduleModeChanged">
+                        <option value="schedule">Working Schedule</option>
+                        <option value="leave">Leave Days</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="modal-body">
+                @if (scheduleMode == "schedule")
+                {
+                    <p class="hint mb-3">Set your working hours for each day of the week. Leave unchecked for days off.</p>
+                    
+                    <div class="schedule-grid">
+                        @foreach (var day in WeekDays)
+                        {
+                            var daySchedule = weeklySchedule[day];
+                            <div class="schedule-day-card">
+                                <div class="day-header">
+                                    <input type="checkbox" @bind="daySchedule.IsWorking" />
+                                    <strong>@day</strong>
+                                </div>
+                                
+                                @if (daySchedule.IsWorking)
+                                {
+                                    <div class="time-inputs">
+                                        <div class="field">
+                                            <label class="label-sm">Start Time</label>
+                                            <input class="input-sm" type="time" value="@daySchedule.StartTime" 
+                                                   @onchange="@(e => daySchedule.StartTime = e.Value?.ToString() ?? "09:00")" />
+                                        </div>
+                                        <div class="field">
+                                            <label class="label-sm">End Time</label>
+                                            <input class="input-sm" type="time" value="@daySchedule.EndTime" 
+                                                   @onchange="@(e => daySchedule.EndTime = e.Value?.ToString() ?? "17:00")" />
+                                        </div>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="day-off-label">Day Off</div>
+                                }
+                            </div>
+                        }
+                    </div>
+
+                    <div class="modal-message">@ScheduleModalMessage</div>
+                }
+                else
+                {
+                    <p class="hint mb-3">Select a date range for your leave. All dates in the range will be saved.</p>
+                    
+                    <div class="leave-section">
+                        <div class="field">
+                            <label class="label">Leave Start Date</label>
+                            <input class="input" type="date" @bind="leaveStartDate" />
+                        </div>
+                        <div class="field">
+                            <label class="label">Leave End Date</label>
+                            <input class="input" type="date" @bind="leaveEndDate" />
+                        </div>
+                        <button class="btn-sm" @onclick="AddLeaveDateRange">Add Leave Period</button>
+                    </div>
+
+                    <div class="leave-list">
+                        <h5>Current Leave Days:</h5>
+                        @if (leaveDates.Any())
+                        {
+                            <div class="leave-dates">
+                                @foreach (var date in leaveDates.OrderBy(d => d))
+                                {
+                                    <div class="leave-date-item">
+                                        <span>@date.ToString("dddd, MMMM dd, yyyy")</span>
+                                        <button class="btn-sm-outline" @onclick="() => RemoveLeaveDate(date)">Remove</button>
+                                    </div>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <p class="empty">No leave days scheduled</p>
+                        }
+                    </div>
+
+                    <div class="modal-message">@ScheduleModalMessage</div>
+                }
+            </div>
+
+            <div class="modal-actions">
+                <button class="btn-sm-outline" @onclick="CloseWorkingScheduleModal">Cancel</button>
+                <button class="btn-sm" @onclick="SaveWorkingSchedule">Save</button>
+            </div>
         </div>
     </div>
 }
+}
+
+<style>
+    .dashboard-wrap {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 14px;
+    }
+
+    .page-title {
+        margin: 6px 0 4px;
+        font-weight: 800;
+    }
+
+    .page-subtitle {
+        margin: 0 0 14px;
+        opacity: 0.85;
+    }
+
+    .panel {
+        border: 1px solid rgba(0,0,0,0.12);
+        border-radius: 10px;
+        padding: 14px;
+        background: #fff;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+        margin-bottom: 14px;
+    }
+
+    .panel-title {
+        font-weight: 850;
+        margin-bottom: 10px;
+    }
+
+    .kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(180px, 1fr));
+        gap: 14px;
+        margin-bottom: 14px;
+    }
+
+    .kpi-card {
+        border: 1px solid rgba(0,0,0,0.12);
+        border-radius: 10px;
+        padding: 14px;
+        background: #fff;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+    }
+
+    .kpi-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+    }
+
+    .kpi-label {
+        font-weight: 650;
+        opacity: 0.85;
+    }
+
+    .kpi-value {
+        font-size: 28px;
+        font-weight: 850;
+        line-height: 1;
+        margin-bottom: 6px;
+    }
+
+    .kpi-hint {
+        font-size: 12px;
+        opacity: 0.75;
+    }
+
+    .kpi-badge {
+        font-size: 11px;
+        padding: 4px 8px;
+        border-radius: 999px;
+        color: #fff;
+        font-weight: 800;
+    }
+
+    .badge-blue {
+        background: #2d6cdf;
+    }
+
+    .badge-green {
+        background: #1f9d55;
+    }
+
+    .badge-orange {
+        background: #f59e0b;
+    }
+
+    .badge-purple {
+        background: #7c3aed;
+    }
+
+    .table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+        .table th, .table td {
+            padding: 10px 8px;
+            border-bottom: 1px solid rgba(0,0,0,0.08);
+            vertical-align: middle;
+        }
+
+        .table th {
+            text-align: left;
+            opacity: 0.8;
+            font-size: 13px;
+        }
+
+    .status {
+        font-size: 12px;
+        padding: 4px 8px;
+        border-radius: 999px;
+        font-weight: 800;
+        display: inline-block;
+        white-space: nowrap;
+    }
+
+        .status.scheduled {
+            background: rgba(45,108,223,0.12);
+            color: #2d6cdf;
+        }
+
+        .status.checked-in {
+            background: rgba(31,157,85,0.12);
+            color: #1f9d55;
+        }
+
+        .status.waiting {
+            background: rgba(245,158,11,0.12);
+            color: #b45309;
+        }
+
+        .status.done {
+            background: rgba(124,58,237,0.10);
+            color: #7c3aed;
+        }
+
+    .form-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(180px, 1fr));
+        gap: 12px;
+    }
+
+    .modal-grid {
+        grid-template-columns: repeat(2, minmax(180px, 1fr));
+    }
+
+    .field {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    .label {
+        font-size: 12px;
+        font-weight: 800;
+        opacity: 0.85;
+    }
+
+    .input {
+        border: 1px solid rgba(0,0,0,0.18);
+        border-radius: 10px;
+        padding: 10px 12px;
+        outline: none;
+    }
+
+        .input:focus {
+            border-color: rgba(45,108,223,0.6);
+        }
+
+    .hint {
+        font-size: 12px;
+        opacity: 0.7;
+    }
+
+    .toggle-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 0;
+    }
+
+    .actions-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-top: 12px;
+    }
+
+    .saved-hint {
+        font-size: 13px;
+        opacity: 0.8;
+    }
+
+    .btn {
+        padding: 10px 12px;
+        border-radius: 10px;
+        border: 1px solid rgba(0,0,0,0.15);
+        background: #111827;
+        color: #fff;
+        font-weight: 800;
+        cursor: pointer;
+    }
+
+        .btn:hover {
+            opacity: 0.92;
+        }
+
+    .btn-sm {
+        padding: 8px 10px;
+        border-radius: 10px;
+        border: 1px solid rgba(0,0,0,0.15);
+        background: #111827;
+        color: #fff;
+        font-weight: 800;
+        cursor: pointer;
+        font-size: 12px;
+    }
+
+        .btn-sm:hover {
+            opacity: 0.92;
+        }
+
+    .btn-sm-outline {
+        background: #fff;
+        color: #111827;
+    }
+
+    .actions-cell {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+
+    .tiny-note {
+        margin-top: 10px;
+        font-size: 12px;
+        opacity: 0.7;
+    }
+
+    .muted {
+        font-size: 12px;
+        opacity: 0.65;
+        margin-left: 6px;
+    }
+
+    .empty {
+        opacity: 0.7;
+        padding: 10px 0;
+    }
+
+    /* Modal */
+    .modal-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.45);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        z-index: 9999;
+    }
+
+    .modal {
+        width: min(680px, 100%);
+        background: #fff;
+        border-radius: 14px;
+        border: 1px solid rgba(0,0,0,0.12);
+        box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+        padding: 14px;
+    }
+
+    .modal-title {
+        font-weight: 900;
+        margin-bottom: 10px;
+    }
+
+    .modal-body {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .read {
+        padding: 10px 12px;
+        border-radius: 10px;
+        background: rgba(0,0,0,0.04);
+        border: 1px solid rgba(0,0,0,0.06);
+    }
+
+    .modal-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+        margin-top: 12px;
+    }
+    
+    /* Working Schedule Modal Styles */
+    .modal-large {
+        width: min(900px, 95%);
+        max-height: 85vh;
+        overflow-y: auto;
+        background: #fff;
+        border-radius: 14px;
+        border: 1px solid rgba(0,0,0,0.12);
+        box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+        padding: 20px;
+    }
+
+    .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 16px;
+        padding-bottom: 12px;
+        border-bottom: 2px solid rgba(0,0,0,0.08);
+    }
+
+    .mode-switcher select {
+        min-width: 180px;
+    }
+
+    .schedule-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 12px;
+        margin-bottom: 16px;
+    }
+
+    .schedule-day-card {
+        border: 1px solid rgba(0,0,0,0.12);
+        border-radius: 10px;
+        padding: 12px;
+        background: #fff;
+    }
+
+    .day-header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 10px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid rgba(0,0,0,0.08);
+    }
+
+    .day-header input[type="checkbox"] {
+        width: 18px;
+        height: 18px;
+    }
+
+    .time-inputs {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+    }
+
+    .label-sm {
+        font-size: 11px;
+        font-weight: 700;
+        opacity: 0.85;
+        margin-bottom: 4px;
+        display: block;
+    }
+
+    .input-sm {
+        border: 1px solid rgba(0,0,0,0.18);
+        border-radius: 8px;
+        padding: 8px 10px;
+        outline: none;
+        width: 100%;
+    }
+
+    .input-sm:focus {
+        border-color: rgba(45,108,223,0.6);
+    }
+
+    .day-off-label {
+        text-align: center;
+        padding: 10px;
+        background: rgba(0,0,0,0.04);
+        border-radius: 8px;
+        font-size: 13px;
+        opacity: 0.7;
+    }
+
+    .leave-section {
+        display: flex;
+        gap: 10px;
+        align-items: end;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+    }
+
+    .leave-section .field {
+        flex: 1;
+        min-width: 200px;
+    }
+
+    .leave-list {
+        margin-top: 20px;
+    }
+
+    .leave-list h5 {
+        margin-bottom: 12px;
+        font-weight: 700;
+    }
+
+    .leave-dates {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .leave-date-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px 12px;
+        background: rgba(0,0,0,0.02);
+        border: 1px solid rgba(0,0,0,0.08);
+        border-radius: 8px;
+    }
+
+    .modal-message {
+        margin-top: 12px;
+        padding: 10px;
+        border-radius: 8px;
+        background: rgba(45,108,223,0.08);
+        color: #2d6cdf;
+        font-size: 13px;
+        min-height: 20px;
+    }
+    
+    .mb-3 {
+        margin-bottom: 12px;
+    }
+
+    /* Responsive */
+    @@media (max-width: 1100px) {
+        .kpi-grid {
+            grid-template-columns: repeat(2, minmax(180px, 1fr));
+        }
+
+        .form-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .modal-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
 
 @code {
-    private string selectedFormat = "pdf";
-    private string exportResult = "";
+    // ===== AUTHORIZATION =====
+    private bool isAuthorized = false;
+    private int currentDoctorId = 0;
 
-    private void DownloadReport()
+    protected override async Task OnInitializedAsync()
     {
-<<<<<<< HEAD
-        exportResult = "Report generation has moved to the Reports page.";
-    }
-}
-=======
-        // 1. Create the Context
-        ReportContext context = new ReportContext();
-
-        // 2. Set the Strategy based on user selection
-        // This is where the "Strategy" is swapped dynamically!
-        if (selectedFormat == "pdf")
+        // Check if user is logged in and has Doctor role
+        if (!Session.IsLoggedIn || !Session.IsInRole("Doctor"))
         {
-            context.SetStrategy(new PdfStrategy());
+            isAuthorized = false;
+            // Redirect to home page after a short delay
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(2000);
+                Nav.NavigateTo("/", true);
+            });
         }
-        else if (selectedFormat == "csv")
+        else
         {
-            context.SetStrategy(new CsvStrategy());
+            isAuthorized = true;
+            currentDoctorId = Session.CurrentUser?.UserID ?? 0;
+            await LoadWorkingSchedule();
+        }
+    }
+    
+    // ===== WORKING SCHEDULE MANAGEMENT =====
+    private bool IsWorkingScheduleModalOpen = false;
+    private string scheduleMode = "schedule"; // "schedule" or "leave"
+    private string ScheduleModalMessage = "";
+    private string ScheduleMessage = "";
+    
+    private readonly List<string> WeekDays = new()
+    {
+        "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"
+    };
+    
+    private Dictionary<string, DaySchedule> weeklySchedule = new();
+    private List<DateTime> leaveDates = new();
+    private DateTime leaveStartDate = DateTime.Today;
+    private DateTime leaveEndDate = DateTime.Today.AddDays(7);
+    
+    private async Task LoadWorkingSchedule()
+    {
+        try
+        {
+            // Initialize weekly schedule
+            foreach (var day in WeekDays)
+            {
+                weeklySchedule[day] = new DaySchedule 
+                { 
+                    Day = day,
+                    StartTime = "09:00",
+                    EndTime = "17:00",
+                    IsWorking = false
+                };
+            }
+            
+            // Load existing schedule from database
+            var workingTimes = await ApiService.GetDoctorWorkingTimesAsync(currentDoctorId);
+            
+            // Populate weekly schedule (type = 'working' and no specific date)
+            foreach (var wt in workingTimes.Where(w => w.Type == "working" && !w.Date.HasValue))
+            {
+                if (weeklySchedule.ContainsKey(wt.Day))
+                {
+                    weeklySchedule[wt.Day].IsWorking = true;
+                    if (wt.StartTime.HasValue)
+                        weeklySchedule[wt.Day].StartTime = wt.StartTime.Value.ToString(@"hh\:mm");
+                    if (wt.EndTime.HasValue)
+                        weeklySchedule[wt.Day].EndTime = wt.EndTime.Value.ToString(@"hh\:mm");
+                }
+            }
+            
+            // Populate leave dates (type = 'on leave')
+            leaveDates = workingTimes
+                .Where(w => w.Type == "on leave" && w.Date.HasValue)
+                .Select(w => w.Date!.Value)
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            ScheduleMessage = $"Error loading schedule: {ex.Message}";
+        }
+    }
+    
+    private async Task OpenWorkingScheduleModal()
+    {
+        await LoadWorkingSchedule();
+        IsWorkingScheduleModalOpen = true;
+        ScheduleModalMessage = "";
+    }
+    
+    private void CloseWorkingScheduleModal()
+    {
+        IsWorkingScheduleModalOpen = false;
+        ScheduleModalMessage = "";
+    }
+    
+    private void OnScheduleModeChanged()
+    {
+        ScheduleModalMessage = "";
+    }
+    
+    private void AddLeaveDateRange()
+    {
+        if (leaveEndDate < leaveStartDate)
+        {
+            ScheduleModalMessage = "End date must be after start date";
+            return;
+        }
+        
+        var daysAdded = 0;
+        var currentDate = leaveStartDate.Date;
+        
+        while (currentDate <= leaveEndDate.Date)
+        {
+            if (!leaveDates.Contains(currentDate))
+            {
+                leaveDates.Add(currentDate);
+                daysAdded++;
+            }
+            currentDate = currentDate.AddDays(1);
+        }
+        
+        if (daysAdded > 0)
+        {
+            ScheduleModalMessage = $"Added {daysAdded} leave day(s) from {leaveStartDate:yyyy-MM-dd} to {leaveEndDate:yyyy-MM-dd}";
+        }
+        else
+        {
+            ScheduleModalMessage = "All dates in this range are already in the leave list";
+        }
+    }
+    
+    private void RemoveLeaveDate(DateTime date)
+    {
+        leaveDates.Remove(date);
+        ScheduleModalMessage = $"Removed {date:yyyy-MM-dd} from leave dates";
+    }
+    
+    private async Task SaveWorkingSchedule()
+    {
+        try
+        {
+            if (scheduleMode == "schedule")
+            {
+                // Save weekly working schedule
+                var workingTimes = new List<WorkingTime>();
+                
+                foreach (var kvp in weeklySchedule)
+                {
+                    if (kvp.Value.IsWorking)
+                    {
+                        workingTimes.Add(new WorkingTime
+                        {
+                            DoctorID = currentDoctorId,
+                            Day = kvp.Key,
+                            StartTime = TimeSpan.Parse(kvp.Value.StartTime),
+                            EndTime = TimeSpan.Parse(kvp.Value.EndTime),
+                            Type = "working",
+                            Date = null // Weekly recurring schedule
+                        });
+                    }
+                }
+                
+                var success = await ApiService.SaveScheduleAsync(currentDoctorId, workingTimes);
+                
+                if (success)
+                {
+                    ScheduleModalMessage = "✓ Weekly schedule saved successfully!";
+                    ScheduleMessage = "Schedule updated successfully";
+                }
+                else
+                {
+                    ScheduleModalMessage = "❌ Failed to save schedule";
+                }
+            }
+            else
+            {
+                // Save leave dates
+                var success = await ApiService.SaveLeavesAsync(currentDoctorId, leaveDates);
+                
+                if (success)
+                {
+                    ScheduleModalMessage = "✓ Leave dates saved successfully!";
+                    ScheduleMessage = "Leave dates updated successfully";
+                }
+                else
+                {
+                    ScheduleModalMessage = "❌ Failed to save leave dates";
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            ScheduleModalMessage = $"❌ Error: {ex.Message}";
+        }
+    }
+    
+    private class DaySchedule
+    {
+        public string Day { get; set; } = "";
+        public bool IsWorking { get; set; }
+        public string StartTime { get; set; } = "09:00";
+        public string EndTime { get; set; } = "17:00";
+    }
+    
+    // ===== MOCK DATA AND EXISTING FUNCTIONALITY =====
+    //  (1) Working settings (mock - kept for KPI display)
+    private TimeOnly WorkingStart = new(9, 0);
+    private TimeOnly WorkingEnd = new(17, 0);
+    private string DayOff = "Sunday";
+    private bool IsOnLeave = false;
+    private DateTime LeaveStartDate = DateTime.Today;
+    private DateTime LeaveEndDate = DateTime.Today.AddDays(1);
+
+    private string SaveMessage = "";
+
+    // Doctor status KPI
+    private string DoctorStatusBadge => IsOnLeave ? "On Leave" : "Active";
+    private string DoctorStatusValue => IsOnLeave ? "OFF" : $"{WorkingStart:HH\\:mm}-{WorkingEnd:HH\\:mm}";
+    private string DoctorStatusHint => IsOnLeave
+        ? $"Leave: {LeaveStartDate:MM/dd} - {LeaveEndDate:MM/dd}"
+        : $"Day Off: {DayOff}";
+
+    //  KPI (mock)
+    private int TodayAppointments => TodaySchedule?.Count ?? 0;
+    private int CompletedConsultations = 7;
+    private int PendingLabReports = 3;
+
+    //  (2) Today schedule (mock) 
+    private List<AppointmentRow> TodaySchedule = new()
+    {
+        new AppointmentRow("P-90210", "John Doe", DateTime.Today.AddHours(9).AddMinutes(30), "Follow-up", "Scheduled"),
+        new AppointmentRow("P-10021", "Alice Tan", DateTime.Today.AddHours(10).AddMinutes(15), "Fever / Flu", "Waiting"),
+        new AppointmentRow("P-77102", "Kumar Raj", DateTime.Today.AddHours(11).AddMinutes(0), "Blood Test Review", "Checked-in"),
+        new AppointmentRow("P-55219", "Nur Aina", DateTime.Today.AddHours(14).AddMinutes(20), "Skin Rash", "Scheduled"),
+    };
+
+    private string GetStatusClass(string? status)
+    {
+        status ??= "Scheduled";
+        return status.Trim().ToLowerInvariant() switch
+        {
+            "scheduled" => "scheduled",
+            "checked-in" => "checked-in",
+            "checked in" => "checked-in",
+            "waiting" => "waiting",
+            "done" => "done",
+            _ => "scheduled"
+        };
+    }
+
+    // ====== (2) Edit appointment modal ======
+    private bool IsEditModalOpen = false;
+    private AppointmentRow? EditingAppointment;
+    private DateTime EditDate = DateTime.Today;
+    private TimeOnly EditTime = new(9, 0);
+    private string ModalMessage = "";
+
+    private void OpenEditModal(AppointmentRow a)
+    {
+        EditingAppointment = a;
+        EditDate = a.AppointmentDateTime.Date;
+        EditTime = TimeOnly.FromDateTime(a.AppointmentDateTime);
+        ModalMessage = "";
+        IsEditModalOpen = true;
+    }
+
+    private void CloseEditModal()
+    {
+        IsEditModalOpen = false;
+        EditingAppointment = null;
+        ModalMessage = "";
+    }
+
+    private void SaveEditAppointment()
+    {
+        if (EditingAppointment == null) return;
+
+        // Combine date + time safely
+        var newDt = EditDate.Date.Add(EditTime.ToTimeSpan());
+        EditingAppointment.AppointmentDateTime = newDt;
+
+        ModalMessage = $"Updated appointment to {newDt:yyyy-MM-dd HH:mm} (mock).";
+        // keep modal open so user can see message; user can close manually
+    }
+
+    // ====== (3) Link to patient records / add diagnosis ======
+    private void GoPatientRecords(string patientId)
+    {
+        Nav.NavigateTo($"/patient-records?patientId={Uri.EscapeDataString(patientId)}");
+    }
+
+    private class AppointmentRow
+    {
+        public AppointmentRow(string patientId, string patientName, DateTime dt, string reason, string status)
+        {
+            PatientId = patientId;
+            PatientName = patientName;
+            AppointmentDateTime = dt;
+            Reason = reason;
+            Status = status;
         }
 
-        // 3. Execute the Strategy
-        // The context doesn't know if it's printing PDF or CSV, it just calls 'GenerateReport'
-        exportResult = context.GenerateReport("Daily Summary: 12 Patients, 3 Pending.");
+        public string PatientId { get; set; }
+        public string PatientName { get; set; }
+        public DateTime AppointmentDateTime { get; set; }
+        public string Reason { get; set; }
+        public string Status { get; set; }
     }
+
+    // ===== Inline Edit (Method A) =====
+    private string? EditingPatientId = null;       
+    private AppointmentRow? EditingRow = null;     
+
+    private DateTime InlineEditDate = DateTime.Today;
+    private TimeOnly InlineEditTime = new(9, 0);
+    private string InlineEditMessage = "";
+
+    private void StartInlineEdit(AppointmentRow a)
+    {
+        EditingPatientId = a.PatientId;
+        EditingRow = a;
+
+        InlineEditDate = a.AppointmentDateTime.Date;
+        InlineEditTime = TimeOnly.FromDateTime(a.AppointmentDateTime);
+
+        InlineEditMessage = "";
+    }
+
+    private void CancelInlineEdit()
+    {
+        EditingPatientId = null;
+        EditingRow = null;
+        InlineEditMessage = "";
+    }
+
+    private async Task SaveInlineEdit()
+    {
+        if (EditingRow == null) return;
+
+        var newDt = InlineEditDate.Date.Add(InlineEditTime.ToTimeSpan());
+        EditingRow.AppointmentDateTime = newDt;
+
+        InlineEditMessage = $"Updated to {newDt:yyyy-MM-dd HH:mm} (mock).";
+
+        await Task.Delay(800);
+
+        EditingPatientId = null;
+        EditingRow = null;
+        InlineEditMessage = "";
+    }
+
 }
->>>>>>> 422f23b6b42e05d1657dada3ee19136d19b15070
