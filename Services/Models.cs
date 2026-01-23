@@ -53,6 +53,7 @@ namespace HealthTech.Services
         public int RoomID { get; set; }
         public string RoomNumber { get; set; } = "";
         public string RoomType { get; set; } = "";
+        public string Status { get; set; } = "Available"; // Available, Unavailable, Maintenance
     }
 
     // Matches the 'Appointment' table (Updated with Foreign Keys)
@@ -78,6 +79,7 @@ namespace HealthTech.Services
     {
         public int RecordID { get; set; }
         public int PatientID { get; set; }
+        public int? DoctorID { get; set; } // Assigned doctor for this record
         public int? InFolder { get; set; } // The Composite Link - which folder this record belongs to
         public string RecordType { get; set; } = "File"; // 'Folder' or 'File'
         public string Title { get; set; } = "";
@@ -85,6 +87,9 @@ namespace HealthTech.Services
         public string FolderName { get; set; } = ""; // Name for folders
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
+        
+        // Helper property for display (we will LEFT JOIN this in SQL)
+        public string? DoctorName { get; set; }
     }
     
     // Matches the 'WorkingTime' table for doctor availability

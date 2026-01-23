@@ -381,6 +381,61 @@ namespace HealthTech.Services
                 return null;
             }
         }
+        
+        public async Task<int> SaveRoomAsync(Room room)
+        {
+            try
+            {
+                var response = await _httpClient.PostAsJsonAsync($"{_baseUrl}/rooms", room);
+                response.EnsureSuccessStatusCode();
+                var result = await response.Content.ReadFromJsonAsync<Dictionary<string, object>>();
+                return result != null && result.ContainsKey("id") ? Convert.ToInt32(result["id"]) : 0;
+            }
+            catch
+            {
+                throw;
+            }
+        }
+        
+        public async Task<bool> UpdateRoomAsync(Room room)
+        {
+            try
+            {
+                var response = await _httpClient.PutAsJsonAsync($"{_baseUrl}/rooms/{room.RoomID}", room);
+                return response.IsSuccessStatusCode;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+        
+        public async Task<bool> DeleteRoomAsync(int roomId)
+        {
+            try
+            {
+                var response = await _httpClient.DeleteAsync($"{_baseUrl}/rooms/{roomId}");
+                return response.IsSuccessStatusCode;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+        
+        public async Task<bool> CheckRoomAvailabilityAsync(int roomId, DateTime dateTime)
+        {
+            try
+            {
+                var response = await _httpClient.GetFromJsonAsync<Dictionary<string, object>>(
+                    $"{_baseUrl}/rooms/available?roomId={roomId}&dateTime={dateTime:yyyy-MM-ddTHH:mm:ss}");
+                return response != null && response.ContainsKey("isAvailable") && Convert.ToBoolean(response["isAvailable"]);
+            }
+            catch
+            {
+                return false;
+            }
+        }
 
         // ==================== WORKING TIME ====================
         

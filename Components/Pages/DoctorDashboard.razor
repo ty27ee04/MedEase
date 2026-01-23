@@ -52,15 +52,6 @@ else
 
         <div class="kpi-card">
             <div class="kpi-header">
-                <span class="kpi-label">Pending Reviews</span>
-                <span class="kpi-badge badge-orange">Pending</span>
-            </div>
-            <div class="kpi-value">@PendingLabReports</div>
-            <div class="kpi-hint">Reports / lab results waiting review.</div>
-        </div>
-
-        <div class="kpi-card">
-            <div class="kpi-header">
                 <span class="kpi-label">Doctor Status</span>
                 <span class="kpi-badge badge-purple">@DoctorStatusBadge</span>
             </div>
@@ -92,7 +83,7 @@ else
                 <tbody>
                     @foreach (var a in TodaySchedule)
                     {
-                        var isEditing = (EditingPatientId == a.PatientId);
+                        var isEditing = (EditingAppointmentId == a.AppointmentID);
 
                         <tr>
                             <td>
@@ -111,7 +102,7 @@ else
 
                             <td>
                                 <span style="font-weight:700;">@a.PatientName</span>
-                                <span class="muted">(ID: @a.PatientId)</span>
+                                <span class="muted">(ID: @a.PatientID)</span>
                             </td>
 
                             <td>@a.Reason</td>
@@ -126,7 +117,7 @@ else
                                     <button class="btn-sm" @onclick="() => StartInlineEdit(a)">Edit Date/Time</button>
 
                                     <button class="btn-sm btn-sm-outline"
-                                            @onclick="() => GoPatientRecords(a.PatientId)">
+                                            @onclick="() => GoPatientRecords(a.PatientID)">
                                         Patient Records / Add Diagnosis
                                     </button>
                                 }
@@ -145,10 +136,6 @@ else
                 </tbody>
 
             </table>
-
-            <div class="tiny-note">
-                Tip: Edit appointment date/time uses mock update now. Later replace with DB update.
-            </div>
         }
     </div>
 
@@ -748,6 +735,7 @@ else
             isAuthorized = true;
             currentDoctorId = Session.CurrentUser?.UserID ?? 0;
             await LoadWorkingSchedule();
+            await LoadTodayAppointments();
         }
     }
     
@@ -804,11 +792,57 @@ else
                 .Where(w => w.Type == "on leave" && w.Date.HasValue)
                 .Select(w => w.Date!.Value)
                 .ToList();
+            
+            // Update doctor status from database
+            UpdateDoctorStatus();
         }
         catch (Exception ex)
         {
             ScheduleMessage = $"Error loading schedule: {ex.Message}";
         }
+    }
+    
+    private void UpdateDoctorStatus()
+    {
+        var today = DateTime.Today;
+        
+        // Check if on leave today
+        IsOnLeave = leaveDates.Any(d => d.Date == today);
+        
+        if (IsOnLeave)
+        {
+            return; // Status badge/value will show "On Leave"
+        }
+        
+        // Get today's day name
+        var todayDayName = today.DayOfWeek.ToString();
+        
+        // Check if working today
+        if (weeklySchedule.ContainsKey(todayDayName) && weeklySchedule[todayDayName].IsWorking)
+        {
+            var schedule = weeklySchedule[todayDayName];
+            WorkingStart = TimeOnly.Parse(schedule.StartTime);
+            WorkingEnd = TimeOnly.Parse(schedule.EndTime);
+            DayOff = GetDayOff();
+        }
+        else
+        {
+            // Today is a day off
+            DayOff = todayDayName;
+        }
+    }
+    
+    private string GetDayOff()
+    {
+        // Find the first non-working day
+        foreach (var day in WeekDays)
+        {
+            if (!weeklySchedule[day].IsWorking)
+            {
+                return day;
+            }
+        }
+        return "None"; // All days are working days
     }
     
     private async Task OpenWorkingScheduleModal()
@@ -951,19 +985,43 @@ else
         ? $"Leave: {LeaveStartDate:MM/dd} - {LeaveEndDate:MM/dd}"
         : $"Day Off: {DayOff}";
 
-    //  KPI (mock)
+    //  KPI - Real data from database
     private int TodayAppointments => TodaySchedule?.Count ?? 0;
-    private int CompletedConsultations = 7;
-    private int PendingLabReports = 3;
+    private int CompletedConsultations => TodaySchedule?.Count(a => a.Status?.ToLower() == "done" || a.Status?.ToLower() == "completed") ?? 0;
 
-    //  (2) Today schedule (mock) 
-    private List<AppointmentRow> TodaySchedule = new()
+    //  (2) Today schedule - Real data from database
+    private List<AppointmentRow> TodaySchedule = new();
+    
+    private async Task LoadTodayAppointments()
     {
-        new AppointmentRow("P-90210", "John Doe", DateTime.Today.AddHours(9).AddMinutes(30), "Follow-up", "Scheduled"),
-        new AppointmentRow("P-10021", "Alice Tan", DateTime.Today.AddHours(10).AddMinutes(15), "Fever / Flu", "Waiting"),
-        new AppointmentRow("P-77102", "Kumar Raj", DateTime.Today.AddHours(11).AddMinutes(0), "Blood Test Review", "Checked-in"),
-        new AppointmentRow("P-55219", "Nur Aina", DateTime.Today.AddHours(14).AddMinutes(20), "Skin Rash", "Scheduled"),
-    };
+        try
+        {
+            var allAppointments = await ApiService.GetAppointmentsByDoctorAsync(currentDoctorId);
+            
+            // Filter for today's appointments
+            var today = DateTime.Today;
+            var todayAppointments = allAppointments
+                .Where(a => a.DateTime.Date == today)
+                .OrderBy(a => a.DateTime)
+                .ToList();
+            
+            TodaySchedule = todayAppointments.Select(a => new AppointmentRow(
+                a.PatientID,
+                a.PatientName,
+                a.DateTime,
+                a.Remark ?? "General Consultation",
+                a.Status,
+                a.AppointmentID
+            )).ToList();
+            
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading appointments: {ex.Message}");
+            TodaySchedule = new();
+        }
+    }
 
     private string GetStatusClass(string? status)
     {
@@ -1015,31 +1073,33 @@ else
     }
 
     // ====== (3) Link to patient records / add diagnosis ======
-    private void GoPatientRecords(string patientId)
+    private void GoPatientRecords(int patientId)
     {
-        Nav.NavigateTo($"/patient-records?patientId={Uri.EscapeDataString(patientId)}");
+        Nav.NavigateTo($"/patient-records?patientId={patientId}");
     }
 
     private class AppointmentRow
     {
-        public AppointmentRow(string patientId, string patientName, DateTime dt, string reason, string status)
+        public AppointmentRow(int patientId, string patientName, DateTime dt, string reason, string status, int appointmentId)
         {
-            PatientId = patientId;
+            PatientID = patientId;
             PatientName = patientName;
             AppointmentDateTime = dt;
             Reason = reason;
             Status = status;
+            AppointmentID = appointmentId;
         }
 
-        public string PatientId { get; set; }
+        public int PatientID { get; set; }
         public string PatientName { get; set; }
         public DateTime AppointmentDateTime { get; set; }
         public string Reason { get; set; }
         public string Status { get; set; }
+        public int AppointmentID { get; set; }
     }
 
-    // ===== Inline Edit (Method A) =====
-    private string? EditingPatientId = null;       
+    // ===== Inline Edit - Connected to Database =====
+    private int? EditingAppointmentId = null;       
     private AppointmentRow? EditingRow = null;     
 
     private DateTime InlineEditDate = DateTime.Today;
@@ -1048,7 +1108,7 @@ else
 
     private void StartInlineEdit(AppointmentRow a)
     {
-        EditingPatientId = a.PatientId;
+        EditingAppointmentId = a.AppointmentID;
         EditingRow = a;
 
         InlineEditDate = a.AppointmentDateTime.Date;
@@ -1059,7 +1119,7 @@ else
 
     private void CancelInlineEdit()
     {
-        EditingPatientId = null;
+        EditingAppointmentId = null;
         EditingRow = null;
         InlineEditMessage = "";
     }
@@ -1068,16 +1128,46 @@ else
     {
         if (EditingRow == null) return;
 
-        var newDt = InlineEditDate.Date.Add(InlineEditTime.ToTimeSpan());
-        EditingRow.AppointmentDateTime = newDt;
-
-        InlineEditMessage = $"Updated to {newDt:yyyy-MM-dd HH:mm} (mock).";
-
-        await Task.Delay(800);
-
-        EditingPatientId = null;
-        EditingRow = null;
-        InlineEditMessage = "";
+        try
+        {
+            var newDt = InlineEditDate.Date.Add(InlineEditTime.ToTimeSpan());
+            
+            // Update in database
+            var appointment = new AppointmentModel
+            {
+                AppointmentID = EditingRow.AppointmentID,
+                PatientID = EditingRow.PatientID,
+                DoctorID = currentDoctorId,
+                DateTime = newDt,
+                Status = EditingRow.Status,
+                Remark = EditingRow.Reason
+            };
+            
+            var success = await ApiService.UpdateAppointmentAsync(appointment);
+            
+            if (success)
+            {
+                EditingRow.AppointmentDateTime = newDt;
+                InlineEditMessage = $"✓ Updated to {newDt:yyyy-MM-dd HH:mm}";
+                
+                await Task.Delay(1500);
+                
+                EditingAppointmentId = null;
+                EditingRow = null;
+                InlineEditMessage = "";
+                
+                // Reload appointments to reflect changes
+                await LoadTodayAppointments();
+            }
+            else
+            {
+                InlineEditMessage = "❌ Failed to update appointment";
+            }
+        }
+        catch (Exception ex)
+        {
+            InlineEditMessage = $"❌ Error: {ex.Message}";
+        }
     }
 
 }

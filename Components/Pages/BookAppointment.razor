@@ -48,9 +48,20 @@
                  <option value="">-- No Room --</option>
                  @foreach (var r in rooms)
                  {
-                     <option value="@r.RoomID">Room @r.RoomNumber (@r.RoomType)</option>
+                     var isUnavailable = r.Status != "Available";
+                     <option value="@r.RoomID" disabled="@isUnavailable">
+                         Room @r.RoomNumber (@r.RoomType) - @r.Status
+                     </option>
                  }
              </select>
+             @if (selectedType == "Physical" && selectedRoomId.HasValue)
+             {
+                 var selectedRoom = rooms.FirstOrDefault(r => r.RoomID == selectedRoomId);
+                 if (selectedRoom != null && selectedRoom.Status != "Available")
+                 {
+                     <small class="text-danger d-block mt-1">⚠️ This room is currently @selectedRoom.Status</small>
+                 }
+             }
         </div>
     </div>
 
@@ -265,6 +276,27 @@
             if (selectedSlot == null || !selectedSlot.IsAvailable)
             {
                 throw new Exception("This time slot is no longer available. Please select another time.");
+            }
+            
+            // Check room availability if physical appointment
+            if (selectedType == "Physical" && selectedRoomId.HasValue)
+            {
+                var room = rooms.FirstOrDefault(r => r.RoomID == selectedRoomId);
+                if (room == null)
+                {
+                    throw new Exception("Selected room not found.");
+                }
+                
+                if (room.Status != "Available")
+                {
+                    throw new Exception($"Room {room.RoomNumber} is currently {room.Status}. Please select another room.");
+                }
+                
+                bool isRoomAvailable = await ApiService.CheckRoomAvailabilityAsync(selectedRoomId.Value, selectedDateTime.Value);
+                if (!isRoomAvailable)
+                {
+                    throw new Exception($"Room {room.RoomNumber} is already booked at this time. Please select another room or time slot.");
+                }
             }
 
             // Factory Logic

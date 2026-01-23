@@ -417,9 +417,9 @@
 
     private void ResetFilters()
     {
-        timeFilter = "Upcoming";
-        filterFromDate = DateTime.Today;
-        filterToDate = DateTime.Today;
+        timeFilter = "All";
+        filterFromDate = DateTime.Today.AddDays(-7);  // Reset to 7 days ago
+        filterToDate = DateTime.Today.AddDays(7);     // Reset to 7 days ahead
         searchText = "";
         statusFilter = "";
         typeFilter = "";

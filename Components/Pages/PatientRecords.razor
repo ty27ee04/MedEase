@@ -3,6 +3,8 @@
 @using HealthTech.Services
 @using Microsoft.AspNetCore.Components
 @inject ApiService ApiService
+@inject UserSession Session
+@inject NavigationManager NavigationManager
 
 
 <PageTitle>Patient Records</PageTitle>
@@ -165,6 +167,21 @@
                                                             <div class="mb-2" @onclick:stopPropagation="true">
                                                                 <input class="form-control mb-2" @bind="editingTitle" placeholder="Title" />
                                                                 <textarea class="form-control mb-2" @bind="editingDetails" rows="3" placeholder="Details"></textarea>
+                                                                
+                                                                @if (record.RecordType == "File" && allDoctors.Count > 0)
+                                                                {
+                                                                    <select class="form-control mb-2" @bind="editingDoctorIdString">
+                                                                        <option value="">-- No doctor assigned --</option>
+                                                                        @foreach (var doctor in allDoctors)
+                                                                        {
+                                                                            <option value="@doctor.UserID">
+                                                                                Dr. @doctor.Name @(!string.IsNullOrEmpty(doctor.Specialization) ? $"({doctor.Specialization})" : "")
+                                                                            </option>
+                                                                        }
+                                                                    </select>
+                                                                    <small class="text-muted d-block mb-2">Assigned doctor</small>
+                                                                }
+                                                                
                                                                 @if (availableFolders.Count > 0)
                                                                 {
                                                                     <select class="form-control" @bind="editingFolderIdString">
@@ -203,6 +220,12 @@
                                                             @if (!string.IsNullOrEmpty(record.Details))
                                                             {
                                                                 <p class="mb-1 text-muted small">@record.Details</p>
+                                                            }
+                                                            @if (record.RecordType == "File" && !string.IsNullOrEmpty(record.DoctorName))
+                                                            {
+                                                                <p class="mb-1">
+                                                                    <span class="badge bg-success">👨‍⚕️ Dr. @record.DoctorName</span>
+                                                                </p>
                                                             }
                                                             <div class="d-flex justify-content-between align-items-center">
                                                                 <small class="text-muted">
@@ -258,6 +281,21 @@
                                                                 <div class="mb-2" @onclick:stopPropagation="true">
                                                                     <input class="form-control mb-2" @bind="editingTitle" placeholder="Title" />
                                                                     <textarea class="form-control mb-2" @bind="editingDetails" rows="3" placeholder="Details"></textarea>
+                                                                    
+                                                                    @if (childFile.RecordType == "File" && allDoctors.Count > 0)
+                                                                    {
+                                                                        <select class="form-control mb-2" @bind="editingDoctorIdString">
+                                                                            <option value="">-- No doctor assigned --</option>
+                                                                            @foreach (var doctor in allDoctors)
+                                                                            {
+                                                                                <option value="@doctor.UserID">
+                                                                                    Dr. @doctor.Name @(!string.IsNullOrEmpty(doctor.Specialization) ? $"({doctor.Specialization})" : "")
+                                                                                </option>
+                                                                            }
+                                                                        </select>
+                                                                        <small class="text-muted d-block mb-2">Assigned doctor</small>
+                                                                    }
+                                                                    
                                                                     @if (availableFolders.Count > 0)
                                                                     {
                                                                         <select class="form-control" @bind="editingFolderIdString">
@@ -296,6 +334,12 @@
                                                                 @if (!string.IsNullOrEmpty(childFile.Details))
                                                                 {
                                                                     <p class="mb-1 text-muted small">@childFile.Details</p>
+                                                                }
+                                                                @if (childFile.RecordType == "File" && !string.IsNullOrEmpty(childFile.DoctorName))
+                                                                {
+                                                                    <p class="mb-1">
+                                                                        <span class="badge bg-success">👨‍⚕️ Dr. @childFile.DoctorName</span>
+                                                                    </p>
                                                                 }
                                                                 <div class="d-flex justify-content-between align-items-center">
                                                                     <small class="text-muted">
@@ -351,6 +395,21 @@
                                                                         <div class="mb-2" @onclick:stopPropagation="true">
                                                                             <input class="form-control mb-2" @bind="editingTitle" placeholder="Title" />
                                                                             <textarea class="form-control mb-2" @bind="editingDetails" rows="3" placeholder="Details"></textarea>
+                                                                            
+                                                                            @if (nestedChild.RecordType == "File" && allDoctors.Count > 0)
+                                                                            {
+                                                                                <select class="form-control mb-2" @bind="editingDoctorIdString">
+                                                                                    <option value="">-- No doctor assigned --</option>
+                                                                                    @foreach (var doctor in allDoctors)
+                                                                                    {
+                                                                                        <option value="@doctor.UserID">
+                                                                                            Dr. @doctor.Name @(!string.IsNullOrEmpty(doctor.Specialization) ? $"({doctor.Specialization})" : "")
+                                                                                        </option>
+                                                                                    }
+                                                                                </select>
+                                                                                <small class="text-muted d-block mb-2">Assigned doctor</small>
+                                                                            }
+                                                                            
                                                                             @if (availableFolders.Count > 0)
                                                                             {
                                                                                 <select class="form-control" @bind="editingFolderIdString">
@@ -389,6 +448,12 @@
                                                                         @if (!string.IsNullOrEmpty(nestedChild.Details))
                                                                         {
                                                                             <p class="mb-1 text-muted small">@nestedChild.Details</p>
+                                                                        }
+                                                                        @if (nestedChild.RecordType == "File" && !string.IsNullOrEmpty(nestedChild.DoctorName))
+                                                                        {
+                                                                            <p class="mb-1">
+                                                                                <span class="badge bg-success">👨‍⚕️ Dr. @nestedChild.DoctorName</span>
+                                                                            </p>
                                                                         }
                                                                         <div class="d-flex justify-content-between align-items-center">
                                                                             <small class="text-muted">
@@ -466,6 +531,23 @@
                             <label class="form-label">Details</label>
                             <textarea class="form-control" @bind="newRecordDetails" placeholder="Details..." rows="3"></textarea>
                         </div>
+
+                        @if (newRecordType == "File" && allDoctors.Count > 0)
+                        {
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Assigned Doctor</label>
+                                <select class="form-control" @bind="newRecordDoctorIdString">
+                                    <option value="">-- No doctor assigned --</option>
+                                    @foreach (var doctor in allDoctors)
+                                    {
+                                        <option value="@doctor.UserID">
+                                            Dr. @doctor.Name @(!string.IsNullOrEmpty(doctor.Specialization) ? $"({doctor.Specialization})" : "")
+                                        </option>
+                                    }
+                                </select>
+                                <small class="text-muted">Select which doctor is in charge of this file</small>
+                            </div>
+                        }
 
                         @if ((newRecordType == "File" || newRecordType == "Folder") && availableFolders.Count > 0)
                         {
@@ -576,22 +658,53 @@
     private string newFolderName = "";
     private int? newRecordParentId = null;
     private string newRecordParentIdString = "";
+    private string newRecordDoctorIdString = "";
+    
+    // Doctor data
+    private List<User> allDoctors = new List<User>();
 
     // Editing
     private int editingRecordId = 0;
     private string editingTitle = "";
     private string editingDetails = "";
     private string editingFolderIdString = "";
+    private string editingDoctorIdString = "";
 
     protected override async Task OnInitializedAsync()
     {
         await LoadPatients();
+        await LoadDoctors();
+        
+        // Auto-select doctor dropdown if current user is a doctor
+        if (Session.IsLoggedIn && Session.IsInRole("Doctor"))
+        {
+            newRecordDoctorIdString = Session.CurrentUser?.UserID.ToString() ?? "";
+        }
+        
+        // Check for patientId query parameter and auto-select patient
+        var uri = new Uri(NavigationManager.Uri);
+        var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
+        var patientIdParam = query["patientId"];
+        
+        if (!string.IsNullOrEmpty(patientIdParam) && int.TryParse(patientIdParam, out int patientId))
+        {
+            var patient = allPatients.FirstOrDefault(p => p.UserID == patientId);
+            if (patient != null)
+            {
+                await SelectPatient(patient);
+            }
+        }
     }
 
     private async Task LoadPatients()
     {
         allPatients = await ApiService.GetUsersByRoleAsync("Patient");
         filteredPatients = allPatients.OrderBy(p => p.Name).ToList();
+    }
+    
+    private async Task LoadDoctors()
+    {
+        allDoctors = await ApiService.GetUsersByRoleAsync("Doctor");
     }
 
     private void FilterPatients()
@@ -790,10 +903,18 @@
             {
                 parentFolderId = parsedId;
             }
+            
+            // Parse the doctor ID from string
+            int? doctorId = null;
+            if (!string.IsNullOrWhiteSpace(newRecordDoctorIdString) && int.TryParse(newRecordDoctorIdString, out int docParsedId))
+            {
+                doctorId = docParsedId;
+            }
 
             var newRecord = new RecordModel
             {
                 PatientID = selectedPatientId,
+                DoctorID = doctorId,
                 InFolder = parentFolderId,
                 RecordType = newRecordType,
                 Title = newRecordTitle,
@@ -801,7 +922,7 @@
                 FolderName = newRecordType == "Folder" ? newRecordTitle : "" // Use title as folder name
             };
 
-            Console.WriteLine($"DEBUG: Saving record - PatientID: {newRecord.PatientID}, Title: {newRecord.Title}, Type: {newRecord.RecordType}, InFolder: {newRecord.InFolder}");
+            Console.WriteLine($"DEBUG: Saving record - PatientID: {newRecord.PatientID}, DoctorID: {newRecord.DoctorID}, Title: {newRecord.Title}, Type: {newRecord.RecordType}, InFolder: {newRecord.InFolder}");
             
             await ApiService.SaveRecordAsync(newRecord);
             
@@ -829,6 +950,7 @@
             newFolderName = "";
             newRecordParentId = null;
             newRecordParentIdString = "";
+            newRecordDoctorIdString = "";
             newRecordType = "File";
             
             // Clear filters to show the new record
@@ -854,7 +976,8 @@
         editingTitle = record.Title;
         editingDetails = record.Details ?? "";
         editingFolderIdString = record.InFolder.HasValue ? record.InFolder.Value.ToString() : "";
-        Console.WriteLine($"[UI] StartEdit - RecordID: {record.RecordID}, InFolder: {record.InFolder}, editingFolderIdString: '{editingFolderIdString}'");
+        editingDoctorIdString = record.DoctorID.HasValue ? record.DoctorID.Value.ToString() : "";
+        Console.WriteLine($"[UI] StartEdit - RecordID: {record.RecordID}, InFolder: {record.InFolder}, DoctorID: {record.DoctorID}, editingFolderIdString: '{editingFolderIdString}', editingDoctorIdString: '{editingDoctorIdString}'");
     }
 
     private async Task SaveEdit()
@@ -871,9 +994,19 @@
             var record = allRecords.FirstOrDefault(r => r.RecordID == editingRecordId);
             if (record != null)
             {
-                Console.WriteLine($"[UI] Before update - RecordID: {record.RecordID}, Title: {record.Title}, Details: {record.Details}, InFolder: {record.InFolder}");
+                Console.WriteLine($"[UI] Before update - RecordID: {record.RecordID}, Title: {record.Title}, Details: {record.Details}, InFolder: {record.InFolder}, DoctorID: {record.DoctorID}");
                 record.Title = editingTitle;
                 record.Details = editingDetails;
+                
+                // Parse and update doctor assignment
+                if (!string.IsNullOrWhiteSpace(editingDoctorIdString) && int.TryParse(editingDoctorIdString, out int doctorId))
+                {
+                    record.DoctorID = doctorId;
+                }
+                else
+                {
+                    record.DoctorID = null;
+                }
                 
                 // Parse and update folder location
                 if (!string.IsNullOrWhiteSpace(editingFolderIdString) && int.TryParse(editingFolderIdString, out int folderId))
@@ -885,7 +1018,7 @@
                     record.InFolder = null;
                 }
                 
-                Console.WriteLine($"[UI] After local update - RecordID: {record.RecordID}, Title: {record.Title}, Details: {record.Details}, InFolder: {record.InFolder}");
+                Console.WriteLine($"[UI] After local update - RecordID: {record.RecordID}, Title: {record.Title}, Details: {record.Details}, InFolder: {record.InFolder}, DoctorID: {record.DoctorID}");
                 
                 var result = await ApiService.UpdateRecordAsync(record);
                 Console.WriteLine($"[UI] API Update result: {result}");
@@ -924,6 +1057,8 @@
         editingRecordId = 0;
         editingTitle = "";
         editingDetails = "";
+        editingFolderIdString = "";
+        editingDoctorIdString = "";
     }
 
     private async Task DeleteRecord(int recordId)
