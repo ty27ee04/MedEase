@@ -834,15 +834,20 @@ else
     
     private string GetDayOff()
     {
-        // Find the first non-working day
+        // Find all non-working days
+        var offDays = new List<string>();
         foreach (var day in WeekDays)
         {
             if (!weeklySchedule[day].IsWorking)
             {
-                return day;
+                offDays.Add(day);
             }
         }
-        return "None"; // All days are working days
+        
+        if (offDays.Count == 0) return "None";
+        if (offDays.Count == 1) return offDays[0];
+        if (offDays.Count == 2) return string.Join(" & ", offDays);
+        return string.Join(", ", offDays);
     }
     
     private async Task OpenWorkingScheduleModal()
@@ -894,10 +899,22 @@ else
         }
     }
     
-    private void RemoveLeaveDate(DateTime date)
+    private async Task RemoveLeaveDate(DateTime date)
     {
         leaveDates.Remove(date);
-        ScheduleModalMessage = $"Removed {date:yyyy-MM-dd} from leave dates";
+        
+        // Also delete from database immediately
+        var success = await ApiService.DeleteLeaveAsync(currentDoctorId, date);
+        
+        if (success)
+        {
+            ScheduleModalMessage = $"✓ Removed {date:yyyy-MM-dd} from leave dates";
+            UpdateDoctorStatus(); // Refresh status display
+        }
+        else
+        {
+            ScheduleModalMessage = $"❌ Failed to remove {date:yyyy-MM-dd}";
+        }
     }
     
     private async Task SaveWorkingSchedule()
@@ -931,6 +948,7 @@ else
                 {
                     ScheduleModalMessage = "✓ Weekly schedule saved successfully!";
                     ScheduleMessage = "Schedule updated successfully";
+                    UpdateDoctorStatus(); // Refresh status display
                 }
                 else
                 {
@@ -946,6 +964,7 @@ else
                 {
                     ScheduleModalMessage = "✓ Leave dates saved successfully!";
                     ScheduleMessage = "Leave dates updated successfully";
+                    UpdateDoctorStatus(); // Refresh status display
                 }
                 else
                 {
@@ -979,11 +998,98 @@ else
     private string SaveMessage = "";
 
     // Doctor status KPI
-    private string DoctorStatusBadge => IsOnLeave ? "On Leave" : "Active";
-    private string DoctorStatusValue => IsOnLeave ? "OFF" : $"{WorkingStart:HH\\:mm}-{WorkingEnd:HH\\:mm}";
-    private string DoctorStatusHint => IsOnLeave
-        ? $"Leave: {LeaveStartDate:MM/dd} - {LeaveEndDate:MM/dd}"
-        : $"Day Off: {DayOff}";
+    private string DoctorStatusBadge
+    {
+        get
+        {
+            var now = DateTime.Now;
+            var today = now.Date;
+            var currentTime = TimeOnly.FromDateTime(now);
+            var todayDayName = today.DayOfWeek.ToString();
+            
+            // Check if on leave
+            if (IsOnLeave) return "On Leave";
+            
+            // Check if today is day off
+            if (weeklySchedule.ContainsKey(todayDayName) && !weeklySchedule[todayDayName].IsWorking)
+            {
+                return "OFF";
+            }
+            
+            // Check if outside working hours
+            if (currentTime < WorkingStart || currentTime >= WorkingEnd)
+            {
+                return "OFF";
+            }
+            
+            return "Active";
+        }
+    }
+    private string DoctorStatusValue
+    {
+        get
+        {
+            if (IsOnLeave) return "OFF";
+            
+            var todayDayName = DateTime.Today.DayOfWeek.ToString();
+            if (weeklySchedule.ContainsKey(todayDayName) && !weeklySchedule[todayDayName].IsWorking)
+            {
+                return "OFF"; // Day off
+            }
+            
+            return $"{WorkingStart:HH\\:mm}-{WorkingEnd:HH\\:mm}";
+        }
+    }
+    private string DoctorStatusHint
+    {
+        get
+        {
+            var today = DateTime.Today;
+            var todayDayName = today.DayOfWeek.ToString();
+            
+            if (IsOnLeave)
+            {
+                // Find the continuous leave period that includes today
+                var sortedDates = leaveDates.OrderBy(d => d).ToList();
+                
+                if (sortedDates.Count == 0) return "On Leave";
+                if (sortedDates.Count == 1) return $"Leave: {sortedDates[0]:MM/dd}";
+                
+                // Find continuous range containing today
+                DateTime rangeStart = today;
+                DateTime rangeEnd = today;
+                
+                foreach (var date in sortedDates)
+                {
+                    if (date < today && date >= rangeStart.AddDays(-1))
+                    {
+                        rangeStart = date;
+                    }
+                    else if (date >= today && date <= rangeEnd.AddDays(1))
+                    {
+                        rangeEnd = date;
+                    }
+                }
+                
+                if (rangeStart == rangeEnd)
+                {
+                    return $"Leave: {rangeStart:MM/dd}";
+                }
+                else
+                {
+                    return $"Leave: {rangeStart:MM/dd} - {rangeEnd:MM/dd}";
+                }
+            }
+            
+            if (weeklySchedule.ContainsKey(todayDayName) && !weeklySchedule[todayDayName].IsWorking)
+            {
+                return $"Day Off: {todayDayName}";
+            }
+            
+            var allDayOffs = GetDayOff();
+            return allDayOffs == "None" ? "No regular day off" : $"Day Off: {allDayOffs}";
+        }
+    }
 
     //  KPI - Real data from database
     private int TodayAppointments => TodaySchedule?.Count ?? 0;
